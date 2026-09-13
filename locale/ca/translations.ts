@@ -248,7 +248,7 @@
     </message>
     <message>
         <source>OFFICIAL_RATING</source>
-        <translation>Valoració parental</translation>
+        <translation>Classificació per edats</translation>
     </message>
     <message>
         <source>PLAY_COUNT</source>
@@ -913,7 +913,7 @@
     </message>
     <message>
         <source>Parental Ratings</source>
-        <translation>Valoracions parentals</translation>
+        <translation>Classificacions per edats</translation>
         <extracomment>Used in Filter menu</extracomment>
     </message>
     <message>
