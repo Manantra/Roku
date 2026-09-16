@@ -48,7 +48,8 @@ sub Main (args as dynamic) as void
         audioPlayer: CreateObject("roSGNode", "AudioPlayer"),
         diagLog: CreateObject("roSGNode", "DiagnosticsLog"),
         jumpTo: {},
-        fallbackFont: string.EMPTY
+        fallbackFont: string.EMPTY,
+        pendingUserSwitch: string.EMPTY
     })
 
     runtimeContext = GetGlobalAA()

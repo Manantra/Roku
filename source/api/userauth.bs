@@ -58,7 +58,9 @@ sub SwitchToSavedUser(account as object)
     if isValidAndNotEmpty(account.serverUrl)
         set_setting("server", account.serverUrl)
     end if
-    set_setting("active_user", account.id)
+
+    ' Signing in decides whether Auto Sign In remembers them, so this only lasts for the run
+    m.global.pendingUserSwitch = account.id
 end sub
 
 ' Each signed in user gets its own registry section keyed by their id

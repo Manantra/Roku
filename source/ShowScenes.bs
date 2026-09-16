@@ -35,6 +35,14 @@ function LoginFlow()
     end if
 
     activeUser = get_setting("active_user")
+
+    ' An in-app switch leaves its user here. Clearing it as we read keeps a failed
+    ' sign in from coming back around and retrying the same user forever
+    if isValidAndNotEmpty(m.global.pendingUserSwitch)
+        activeUser = m.global.pendingUserSwitch
+        m.global.pendingUserSwitch = ""
+    end if
+
     if activeUser = invalid
         user_select:
         SendPerformanceBeacon("AppDialogInitiate") ' Roku Performance monitoring - Dialog Starting
