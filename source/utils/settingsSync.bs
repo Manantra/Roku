@@ -59,7 +59,7 @@ namespace settingsSync
 
             ' Settings the server can now store that already had a switch here.
             { pluginKey: "cinemaModeEnabled", rokuKey: "playback.cinemamode", type: "bool" },
-            { pluginKey: "autoplayNextEpisode", rokuKey: "playback.showNextUpAfterFinish", type: "bool" },
+            { pluginKey: "autoplayNextEpisode", rokuKey: "playback.autoplaynextepisode", type: "bool" },
             { pluginKey: "resumeSubtractDuration", rokuKey: "playback.resumeRewind", type: "direct" },
             { pluginKey: "unpauseRewindDuration", rokuKey: "playback.unpauseRewind", type: "intToStr" },
             { pluginKey: "skipBackLength", rokuKey: "playback.skipBackLength", type: "secondsToMs" },

@@ -5778,6 +5778,13 @@
             "default": "0"
           },
           {
+            "title": "Autoplay Next Episode",
+            "description": "Start the next episode on its own when the current one ends. Requires 'Play next episode automatically' server setting to be enabled.",
+            "settingName": "playback.autoplaynextepisode",
+            "type": "bool",
+            "default": "true"
+          },
+          {
             "title": "Autoplay Episode Limit",
             "description": "The number of episodes that will play automatically after the selected episode. Requires 'Play next episode automatically' server setting to be enabled.",
             "settingName": "episodeQueueLimit",

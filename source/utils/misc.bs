@@ -668,6 +668,12 @@ function getHomeBackdropBlurAmount() as integer
     return 10 ' Default blur amount
 end function
 
+' Autoplay needs the server switch and the switch here, so either one can turn it off
+function isAutoplayNextEpisodeEnabled() as boolean
+    if not chainLookupReturn(m.global.session, "user.Configuration.EnableNextEpisodeAutoPlay", false) then return false
+
+    return get_user_setting_bool("playback.autoplaynextepisode", true)
+end function
 
 ' Get whether theme music auto-play is enabled
 ' Returns a boolean indicating if theme music should play on detail screens

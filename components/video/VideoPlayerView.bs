@@ -1364,7 +1364,7 @@ sub onNextUpTick()
     if remaining > 0 then return
 
     hideNextItem()
-    if toBoolean(m.global.session.user.settings["playback.showNextUpAfterFinish"] ?? false)
+    if isAutoplayNextEpisodeEnabled()
         playNextUpItem()
     else
         cancelNextItem()
