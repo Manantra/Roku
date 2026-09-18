@@ -9,5 +9,7 @@
     <field id="action" type="string" value="" />
     <field id="rowHeight" type="integer" value="0" />
     <field id="noIndicator" type="boolean" value="false" />
+    <!-- A row that says something rather than naming a choice, so its text wraps -->
+    <field id="paragraph" type="boolean" value="false" />
   </interface>
 </component>

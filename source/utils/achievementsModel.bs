@@ -7,6 +7,11 @@ import "pkg:/source/utils/misc.bs"
 ' author badges with any category, rarity or icon they like, which is why none of those are a
 ' fixed set.
 
+' How a reroll attempt ended. A spent reroll is a refusal the panel reports plainly, not a fault.
+const REROLLED = "rerolled"
+const REROLL_ALREADY_USED = "alreadyUsed"
+const REROLL_FAILED = "failed"
+
 namespace achievementsModel
 
     function IsObject(value as dynamic) as boolean
@@ -220,7 +225,23 @@ namespace achievementsModel
 
         daily = QuestList(Field(json, "Daily"))
         weekly = QuestList(Field(json, "Weekly"))
-        return { daily: daily, weekly: weekly, isEmpty: daily.count() = 0 and weekly.count() = 0 }
+
+        return {
+            daily: daily,
+            weekly: weekly,
+            ' One reroll per UTC day and one per ISO week, so these are only ever 1 or 0
+            dailyRerollsLeft: AsInt(Field(json, "DailyRerollsRemaining")),
+            weeklyRerollsLeft: AsInt(Field(json, "WeeklyRerollsRemaining")),
+            isEmpty: daily.count() = 0 and weekly.count() = 0
+        }
+    end function
+
+    ' The replacement set comes back with the answer, so a reroll needs no second fetch
+    function ParseRerolledQuests(json as object) as object
+        return {
+            quests: QuestList(Field(json, "Quests")),
+            rerollsLeft: AsInt(Field(json, "RerollsRemaining"))
+        }
     end function
 
     ' The overall board carries a score and a completion count. A category board carries one

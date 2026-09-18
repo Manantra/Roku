@@ -96,12 +96,20 @@
         <translation>Compact. More rows on screen at once.</translation>
     </message>
     <message>
+        <source>Confirm</source>
+        <translation>Confirm</translation>
+    </message>
+    <message>
         <source>Connect to Server</source>
         <translation>Connect to Server</translation>
     </message>
     <message>
         <source>Could not load your achievements.</source>
         <translation>Could not load your achievements.</translation>
+    </message>
+    <message>
+        <source>Could not reroll those quests.</source>
+        <translation>Could not reroll those quests.</translation>
     </message>
     <message>
         <source>Crew</source>
@@ -317,6 +325,18 @@
         <translation>Recommendations</translation>
     </message>
     <message>
+        <source>Reroll daily quests</source>
+        <translation>Reroll daily quests</translation>
+    </message>
+    <message>
+        <source>Reroll these quests?</source>
+        <translation>Reroll these quests?</translation>
+    </message>
+    <message>
+        <source>Reroll weekly quests</source>
+        <translation>Reroll weekly quests</translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Reset</translation>
     </message>
@@ -408,6 +428,10 @@
         <translation>Subtitles</translation>
     </message>
     <message>
+        <source>Swap this set for a different one</source>
+        <translation>Swap this set for a different one</translation>
+    </message>
+    <message>
         <source>SyncPlay watch parties</source>
         <translation>SyncPlay watch parties</translation>
     </message>
@@ -458,6 +482,16 @@
         <translation>Up Next</translation>
     </message>
     <message>
+        <source>Used this week, comes back Monday UTC</source>
+        <extracomment>Shown once the week's quest reroll is spent</extracomment>
+        <translation>Used this week, comes back Monday UTC</translation>
+    </message>
+    <message>
+        <source>Used today, comes back at midnight UTC</source>
+        <extracomment>Shown once the day's quest reroll is spent</extracomment>
+        <translation>Used today, comes back at midnight UTC</translation>
+    </message>
+    <message>
         <source>Versions</source>
         <translation>Versions</translation>
     </message>
@@ -468,6 +502,10 @@
     <message>
         <source>Watched</source>
         <translation>Watched</translation>
+    </message>
+    <message>
+        <source>You get one daily and one weekly reroll, and this spends it.</source>
+        <translation>You get one daily and one weekly reroll, and this spends it.</translation>
     </message>
     <message>
         <source>Settings</source>

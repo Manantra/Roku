@@ -7,7 +7,8 @@ import "pkg:/source/utils/misc.bs"
 '
 ' Nothing here throws. A server without the plugin answers 404 on every route, and a panel that
 ' asked for everything at once and got nothing back wants an empty screen rather than a pile of
-' errors, so a failed call reads as no answer. Nothing here polls.
+' errors, so a failed call reads as no answer. Nothing here polls, and the login ping and the
+' quest reroll are the only writes.
 
 const ACHIEVEMENTS_ROOT = "/Plugins/AchievementBadges"
 ' What the panel opens on, so the screen that can change it knows what it was handed
@@ -61,18 +62,56 @@ namespace achievements
         }
     end function
 
-    ' The one thing the plugin needs a client to drive, since it is what keeps a daily login
-    ' streak alive. Nothing waits on it and nothing reads the answer.
+    ' The status travels back with the body, since the reroll is the one call that has to tell a
+    ' refusal from a fault and the shared helpers throw the status away
+    function Post(path as string) as object
+        answer = { status: 0, data: invalid }
+
+        req = APIRequest(`${ACHIEVEMENTS_ROOT}/${path}`)
+        if not isValid(req) then return answer
+
+        started = diagnostics.StartTrace("POST", req)
+        req.SetRequest("POST")
+        req.setMessagePort(CreateObject("roMessagePort"))
+        req.AddHeader("Content-Type", "application/json")
+        req.AsyncPostFromString("")
+
+        event = wait(30000, req.GetMessagePort())
+        if type(event) <> "roUrlEvent"
+            diagnostics.EndTrace(started, "timed out", diagnostics.LEVEL_ERROR)
+            return answer
+        end if
+
+        answer.status = event.GetResponseCode()
+        diagnostics.EndTrace(started, answer.status.ToStr(), answer.status = 200 ? diagnostics.LEVEL_DEBUG : diagnostics.LEVEL_WARN)
+
+        body = event.GetString()
+        if body <> "" then answer.data = ParseJson(body)
+        return answer
+    end function
+
+    ' What keeps a daily login streak alive. Nothing reads the answer.
     sub SendLoginPing()
         userId = chainLookupReturn(m.global, "session.user.id", "")
         if not isValidAndNotEmpty(userId) then return
 
-        req = APIRequest(`${ACHIEVEMENTS_ROOT}/users/${userId}/login-ping`)
-        if not isValid(req) then return
-
-        req.SetRequest("POST")
-        postJson(req, "")
+        Post(`users/${userId}/login-ping`)
     end sub
+
+    ' Swaps one quest set for a fresh one. The plugin answers 429 once that allowance is spent.
+    function RerollQuests(weekly as boolean) as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return { outcome: REROLL_FAILED }
+
+        questSet = weekly ? "weekly" : "daily"
+        answer = Post(`users/${userId}/quests/${questSet}/reroll`)
+
+        if answer.status = 429 then return { outcome: REROLL_ALREADY_USED }
+        if not achievementsModel.IsObject(answer.data) then return { outcome: REROLL_FAILED }
+
+        fresh = achievementsModel.ParseRerolledQuests(answer.data)
+        return { outcome: REROLLED, quests: fresh.quests, rerollsLeft: fresh.rerollsLeft }
+    end function
 
     function FetchLeaderboard(category = "" as string, limit = 10 as integer) as object
         if not Flags().leaderboardEnabled then return []

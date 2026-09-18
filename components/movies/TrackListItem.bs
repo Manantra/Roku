@@ -28,8 +28,11 @@ sub init()
     m.trackName = m.top.findNode("trackName")
     m.trackInfo = m.top.findNode("trackInfo")
 
+    m.trackNote = m.top.findNode("trackNote")
+
     m.trackName.font.size = NAME_SIZE
     m.trackInfo.font.size = INFO_SIZE
+    m.trackNote.font.size = INFO_SIZE
 
     m.accent = formatSceneGraphColor(chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT), ColorPalette.HIGHLIGHT)
     m.rowBg.color = m.accent
@@ -71,11 +74,22 @@ sub onContentChanged()
     m.indicator.uri = selected ? "pkg:/images/tracks/checked.png" : "pkg:/images/tracks/unchecked.png"
     m.indicator.blendColor = selected ? m.accent : IDLE_INDICATOR
 
+    ' A row that carries a sentence puts it in the wrapping label, which takes the room
+    ' of the name and the detail together
+    paragraph = content.paragraph = true
+    m.trackNote.visible = paragraph
+    m.trackName.visible = not paragraph
+
     m.trackName.text = content.title ?? ""
     m.trackName.color = content.dimmed = true ? DIM_INK : "#FFFFFF"
 
     m.trackInfo.text = content.description ?? ""
-    m.trackInfo.visible = m.trackInfo.text <> ""
+    m.trackInfo.visible = not paragraph and m.trackInfo.text <> ""
+
+    if paragraph
+        m.trackNote.text = m.trackName.text
+        m.trackNote.color = m.trackName.color
+    end if
 
     m.divider.visible = content.dividerAbove = true
     buildFlags(content.flags)
@@ -86,7 +100,7 @@ sub onContentChanged()
     rowHeight = content.rowHeight > 0 ? content.rowHeight : trackDialog.RowHeight()
     top = m.divider.visible ? trackDialog.DividerBand() : 0
     band = rowHeight - top
-    used = trackDialog.ROW_NAME_LINE
+    used = trackDialog.ROW_NAME_LINE + (paragraph ? trackDialog.ROW_INFO_LINE : 0)
     if m.trackInfo.visible then used += trackDialog.ROW_INFO_LINE
     if m.flags.visible then used += trackDialog.ROW_FLAG_LINE
     contentTop = top + ((band - used) / 2)
@@ -95,6 +109,12 @@ sub onContentChanged()
     m.indicator.translation = [trackDialog.ROW_PAD_X, top + ((band - INDICATOR_SIZE) / 2)]
     m.trackName.translation = [textLeft, contentTop]
     m.trackInfo.translation = [textLeft, contentTop + trackDialog.ROW_NAME_LINE]
+
+    if paragraph
+        m.trackNote.width = trackDialog.PANEL_WIDTH - textLeft - trackDialog.ROW_PAD_X
+        m.trackNote.height = used
+        m.trackNote.translation = [textLeft, contentTop]
+    end if
 
     flagTop = contentTop + trackDialog.ROW_NAME_LINE
     if m.trackInfo.visible then flagTop += trackDialog.ROW_INFO_LINE

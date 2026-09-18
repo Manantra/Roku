@@ -61,6 +61,8 @@ sub onContentChanged()
     m.rowFill.blendColor = m.restingFill
     if m.isHeading then m.rowFocus.visible = false
 
+    m.top.opacity = data.dimmed = true ? 0.45 : 1.0
+
     layoutLeading(data, height)
     layoutBody(data, height)
     layoutTrailing(data, height)

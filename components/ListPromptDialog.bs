@@ -28,6 +28,7 @@ sub showDialog()
         row.title = m.top.message
         row.dimmed = true
         row.noIndicator = true
+        row.paragraph = true
         row.rowHeight = trackDialog.RowHeight()
         m.firstOption = 1
     end if

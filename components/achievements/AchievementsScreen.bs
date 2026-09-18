@@ -95,6 +95,11 @@ sub init()
     m.recap = invalid
     m.rows = []
     m.onRetry = false
+    m.rerollBusy = false
+    m.rerollFailed = false
+    m.rerollWeekly = false
+    m.rerollPrompt = invalid
+    m.rerollIndex = -1
 
     m.top.optionsAvailable = false
     themeApply.ApplyToItem(m.top)
@@ -106,7 +111,8 @@ sub OnScreenShown(_isReturning = false as boolean)
 end sub
 
 sub startLoad(request as object)
-    m.loading = true
+    ' A reroll answers one row, so the quests stay on screen rather than blanking to a spinner
+    m.loading = request.kind <> "reroll"
     render()
     m.loadTask.control = TaskControl.STOP
     m.loadTask.request = request
@@ -118,7 +124,9 @@ sub onLoadResult(event as object)
     if not isValid(result) then return
 
     m.loading = false
-    if result.kind = "leaderboard"
+    if result.kind = "reroll"
+        applyReroll(result.weekly, result.reroll)
+    else if result.kind = "leaderboard"
         m.boardEntries = result.entries
     else if result.kind = "recap"
         m.recap = result.recap
@@ -131,6 +139,7 @@ sub onLoadResult(event as object)
     end if
 
     render()
+    if result.kind = "reroll" then focusRow(m.rerollIndex)
 end sub
 
 ' ===== Views =====
@@ -147,7 +156,7 @@ function popView() as boolean
     held = m.stack.pop()
     m.view = held.view
     render()
-    if held.index >= 0 and held.index < m.rows.count() then m.rowList.jumpToItem = held.index
+    focusRow(held.index)
     return true
 end function
 
@@ -593,6 +602,7 @@ function questRows() as object
         for each quest in quests.daily
             rows.push(questRow(quest))
         end for
+        rows.push(rerollRow(false, quests.dailyRerollsLeft))
     end if
 
     if quests.weekly.count() > 0
@@ -600,7 +610,11 @@ function questRows() as object
         for each quest in quests.weekly
             rows.push(questRow(quest))
         end for
+        rows.push(rerollRow(true, quests.weeklyRerollsLeft))
     end if
+
+    ' The failure sits under the sets rather than replacing them, so the quests stay readable
+    if m.rerollFailed then rows.push(headingRow(tr("Could not reroll those quests.")))
 
     return rows
 end function
@@ -619,6 +633,28 @@ function questRow(quest as object) as object
         trailingTop: substitute(tr("+{0}"), quest.reward.toStr()),
         trailingColor: m.accent,
         height: 160
+    }
+end function
+
+function rerollRow(weekly as boolean, rerollsLeft as integer) as object
+    spent = rerollsLeft <= 0
+    offered = not spent and not m.rerollBusy
+
+    caption = tr("Swap this set for a different one")
+    if spent
+        caption = weekly ? tr("Used this week, comes back Monday UTC") : tr("Used today, comes back at midnight UTC")
+    end if
+
+    return {
+        kind: "reroll",
+        weekly: weekly,
+        offered: offered,
+        dimmed: not offered,
+        title: weekly ? tr("Reroll weekly quests") : tr("Reroll daily quests"),
+        caption: caption,
+        icon: "casino",
+        tint: m.accent,
+        height: 120
     }
 end function
 
@@ -722,6 +758,66 @@ function mediumDate(date as object) as string
     return `${months[month - 1]} ${date.GetDayOfMonth()}, ${date.GetYear()}`
 end function
 
+' ===== Rerolls =====
+
+' Spending a reroll is worth asking about, since there is no way back
+sub askReroll(weekly as boolean)
+    m.rerollWeekly = weekly
+    m.rerollIndex = m.rowList.itemFocused
+
+    m.rerollPrompt = CreateObject("roSGNode", "ListPromptDialog")
+    m.rerollPrompt.dialogTitle = tr("Reroll these quests?")
+    m.rerollPrompt.message = tr("You get one daily and one weekly reroll, and this spends it.")
+    m.rerollPrompt.options = [tr("Cancel"), tr("Confirm")]
+    m.rerollPrompt.returnFocus = m.rowList
+    m.rerollPrompt.observeField("optionSelected", "onRerollChosen")
+
+    m.top.getScene().appendChild(m.rerollPrompt)
+    m.rerollPrompt.callFunc("showDialog")
+end sub
+
+sub onRerollChosen(event as object)
+    chosen = event.getData()
+    closeRerollPrompt()
+    if chosen <> 1 then return
+
+    m.rerollBusy = true
+    m.rerollFailed = false
+    render()
+    focusRow(m.rerollIndex)
+    startLoad({ kind: "reroll", weekly: m.rerollWeekly })
+end sub
+
+sub closeRerollPrompt()
+    if not isValid(m.rerollPrompt) then return
+
+    m.rerollPrompt.unobserveField("optionSelected")
+    m.top.getScene().removeChild(m.rerollPrompt)
+    m.rerollPrompt = invalid
+end sub
+
+' The server is the authority on what is left, so its answer settles the row whether it handed
+' back a fresh set or refused
+sub applyReroll(weekly as boolean, result as object)
+    m.rerollBusy = false
+    m.rerollFailed = result.outcome = REROLL_FAILED
+    if m.rerollFailed then return
+
+    quests = m.overview.quests
+    if not isValid(quests) then return
+
+    swapped = result.outcome = REROLLED
+    left = swapped ? result.rerollsLeft : 0
+
+    if weekly
+        if swapped then quests.weekly = result.quests
+        quests.weeklyRerollsLeft = left
+    else
+        if swapped then quests.daily = result.quests
+        quests.dailyRerollsLeft = left
+    end if
+end sub
+
 ' ===== Input =====
 
 sub onTabActivated()
@@ -792,6 +888,17 @@ sub onRowFocused()
     m.skipHeadingTimer.control = "start"
 end sub
 
+' Puts the cursor back on a row after the list is built again. The list focuses its first row
+' as soon as it has content, and that row is a heading, so the skip it queued is dropped first
+sub focusRow(index as integer)
+    if index < 0 or index >= m.rows.count() then return
+
+    m.skipHeadingTimer.control = "stop"
+    m.pendingFocusIndex = -1
+    m.lastFocusIndex = index
+    m.rowList.jumpToItem = index
+end sub
+
 sub onSkipHeadingTimer()
     if m.pendingFocusIndex < 0 then return
 
@@ -808,6 +915,11 @@ sub onRowSelected()
     row = m.rows[index]
     if row.kind = "nav"
         if isValidAndNotEmpty(row.view) then pushView(row.view)
+        return
+    end if
+
+    if row.kind = "reroll"
+        if row.offered then askReroll(row.weekly)
         return
     end if
 
