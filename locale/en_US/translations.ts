@@ -108,8 +108,16 @@
         <translation>Could not load your achievements.</translation>
     </message>
     <message>
+        <source>Could not use that power-up.</source>
+        <translation>Could not use that power-up.</translation>
+    </message>
+    <message>
         <source>Could not reroll those quests.</source>
         <translation>Could not reroll those quests.</translation>
+    </message>
+    <message>
+        <source>Covers one missed day. Only one can be banked.</source>
+        <translation>Covers one missed day. Only one can be banked.</translation>
     </message>
     <message>
         <source>Crew</source>
@@ -122,6 +130,14 @@
     <message>
         <source>Daily</source>
         <translation>Daily</translation>
+    </message>
+    <message>
+        <source>Double Credit</source>
+        <translation>Double Credit</translation>
+    </message>
+    <message>
+        <source>Doubles score for an hour. Using it again restarts the hour.</source>
+        <translation>Doubles score for an hour. Using it again restarts the hour.</translation>
     </message>
     <message>
         <source>Direct Play</source>
@@ -220,6 +236,10 @@
         <translation>Library completion</translation>
     </message>
     <message>
+        <source>Loadout</source>
+        <translation>Loadout</translation>
+    </message>
+    <message>
         <source>Loading...</source>
         <translation>Loading…</translation>
     </message>
@@ -280,6 +300,10 @@
         <translation>Nothing to suggest for this badge.</translation>
     </message>
     <message>
+        <source>None held</source>
+        <translation>None held</translation>
+    </message>
+    <message>
         <source>Off</source>
         <translation>Off</translation>
     </message>
@@ -317,6 +341,11 @@
         <translation>Please sign in</translation>
     </message>
     <message>
+        <source>Power-ups</source>
+        <extracomment>The consumables a viewer holds</extracomment>
+        <translation>Power-ups</translation>
+    </message>
+    <message>
         <source>Progress</source>
         <extracomment>How far along a badge is</extracomment>
         <translation>Progress</translation>
@@ -324,6 +353,11 @@
     <message>
         <source>Recap</source>
         <translation>Recap</translation>
+    </message>
+    <message>
+        <source>Running now</source>
+        <extracomment>Shown on a power-up that is already working</extracomment>
+        <translation>Running now</translation>
     </message>
     <message>
         <source>Quests</source>
@@ -348,6 +382,14 @@
     <message>
         <source>Reset</source>
         <translation>Reset</translation>
+    </message>
+    <message>
+        <source>Score bank</source>
+        <translation>Score bank</translation>
+    </message>
+    <message>
+        <source>Score to spend and the boosts you hold</source>
+        <translation>Score to spend and the boosts you hold</translation>
     </message>
     <message>
         <source>Restart</source>
@@ -425,6 +467,10 @@
         <translation>Streak</translation>
     </message>
     <message>
+        <source>Streak Freeze</source>
+        <translation>Streak Freeze</translation>
+    </message>
+    <message>
         <source>Submit</source>
         <translation>Submit</translation>
     </message>
@@ -439,6 +485,10 @@
     <message>
         <source>Suggested items to watch</source>
         <translation>Suggested items to watch</translation>
+    </message>
+    <message>
+        <source>The next thing you finish counts twice towards badges.</source>
+        <translation>The next thing you finish counts twice towards badges.</translation>
     </message>
     <message>
         <source>Swap this set for a different one</source>
@@ -495,6 +545,10 @@
         <translation>Up Next</translation>
     </message>
     <message>
+        <source>Use this power-up?</source>
+        <translation>Use this power-up?</translation>
+    </message>
+    <message>
         <source>Used this week, comes back Monday UTC</source>
         <extracomment>Shown once the week's quest reroll is spent</extracomment>
         <translation>Used this week, comes back Monday UTC</translation>
@@ -517,8 +571,16 @@
         <translation>Watched</translation>
     </message>
     <message>
+        <source>XP Boost</source>
+        <translation>XP Boost</translation>
+    </message>
+    <message>
         <source>You get one daily and one weekly reroll, and this spends it.</source>
         <translation>You get one daily and one weekly reroll, and this spends it.</translation>
+    </message>
+    <message>
+        <source>It's spent as soon as you confirm.</source>
+        <translation>It's spent as soon as you confirm.</translation>
     </message>
     <message>
         <source>Settings</source>
@@ -2887,9 +2949,18 @@
         <translation>{0} pts</translation>
     </message>
     <message>
+        <source>{0} held</source>
+        <extracomment>How many of a power-up the viewer holds</extracomment>
+        <translation>{0} held</translation>
+    </message>
+    <message>
         <source>{0} min</source>
         <extracomment>How long a suggested item runs</extracomment>
         <translation>{0} min</translation>
+    </message>
+    <message>
+        <source>1 held</source>
+        <translation>1 held</translation>
     </message>
     <message>
         <source>{0} libraries</source>

@@ -13,6 +13,7 @@ const ACHIEVEMENT_AVATAR = 48
 const ACHIEVEMENT_GUTTER = 56
 const ACHIEVEMENT_BODY_X = 88
 const ACHIEVEMENT_TRAILING = 150
+const PROGRESS_INK = "#FFFFFFB3"
 
 sub init()
     m.rowFill = m.top.findNode("rowFill")
@@ -146,6 +147,7 @@ sub layoutBody(data as object, height as float)
     m.progressText.visible = hasProgress
     if hasProgress
         m.progressText.text = data.progressText
+        m.progressText.color = isValidAndNotEmpty(data.progressColor) ? data.progressColor : PROGRESS_INK
         m.progressText.width = width
         m.progressText.height = 26
         m.progressText.translation = [x, y]

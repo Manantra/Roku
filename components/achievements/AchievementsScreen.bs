@@ -95,14 +95,18 @@ sub init()
     m.boardEntries = []
     m.recap = invalid
     m.rows = []
-    m.onRetry = false
+    m.retryKind = ""
     m.badgeId = ""
     m.chase = invalid
+    m.powerUps = invalid
+    m.powerUpProblem = ""
+    m.powerUpBusy = false
+    m.powerUpType = ""
     m.rerollBusy = false
     m.rerollFailed = false
     m.rerollWeekly = false
-    m.rerollPrompt = invalid
-    m.rerollIndex = -1
+    m.spendPrompt = invalid
+    m.spendIndex = -1
 
     m.top.optionsAvailable = false
     themeApply.ApplyToItem(m.top)
@@ -114,8 +118,9 @@ sub OnScreenShown(_isReturning = false as boolean)
 end sub
 
 sub startLoad(request as object)
-    ' A reroll answers one row, so the quests stay on screen rather than blanking to a spinner
-    m.loading = request.kind <> "reroll"
+    ' A reroll or a spend answers one row, so the list stays on screen rather than blanking to
+    ' a spinner
+    m.loading = request.kind <> "reroll" and request.kind <> "usePowerUp"
     render()
     m.loadTask.control = TaskControl.STOP
     m.loadTask.request = request
@@ -131,6 +136,10 @@ sub onLoadResult(event as object)
         applyReroll(result.weekly, result.reroll)
     else if result.kind = "chase"
         m.chase = result.chase
+    else if result.kind = "powerups"
+        m.powerUps = result.powerUps
+    else if result.kind = "usePowerUp"
+        applySpend(result.spend)
     else if result.kind = "leaderboard"
         m.boardEntries = result.entries
     else if result.kind = "recap"
@@ -144,7 +153,7 @@ sub onLoadResult(event as object)
     end if
 
     render()
-    if result.kind = "reroll" then focusRow(m.rerollIndex)
+    if result.kind = "reroll" or result.kind = "usePowerUp" then focusRow(m.spendIndex)
 end sub
 
 ' ===== Views =====
@@ -176,7 +185,7 @@ sub render()
     m.rowList.visible = false
     m.message.visible = false
     m.retryButton.visible = false
-    m.onRetry = false
+    m.retryKind = ""
 
     if m.loading and not hasOverview
         showMessage(tr("Loading..."))
@@ -184,11 +193,7 @@ sub render()
     end if
 
     if not hasOverview
-        showMessage(tr("Could not load your achievements."))
-        m.retryButton.visible = true
-        m.onRetry = true
-        m.retryFocus.visible = true
-        m.retryButton.setFocus(true)
+        showLoadFailed("overview")
         return
     end if
 
@@ -200,6 +205,12 @@ sub render()
         m.rows = badgeRows()
     else if m.view = "badge"
         m.rows = badgeViewRows()
+    else if m.view = "loadout"
+        if not m.loading and not isValid(m.powerUps)
+            showLoadFailed("powerups")
+            return
+        end if
+        m.rows = loadoutRows()
     else if m.view = "quests"
         m.rows = questRows()
     else if m.view = "leaderboard"
@@ -233,9 +244,19 @@ function breadcrumb() as string
     if m.view = "quests" then return `${title} / ${tr("Quests")}`
     if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
+    if m.view = "loadout" then return `${title} / ${tr("Loadout")}`
     if m.view = "library" then return `${title} / ${tr("Library completion")}`
     return title
 end function
+
+' What a screen shows when the plugin answered it with nothing
+sub showLoadFailed(retryKind as string)
+    showMessage(tr("Could not load your achievements."))
+    m.retryKind = retryKind
+    m.retryButton.visible = true
+    m.retryFocus.visible = true
+    m.retryButton.setFocus(true)
+end sub
 
 sub showMessage(text as string)
     m.message.text = text
@@ -524,6 +545,8 @@ function overviewRows() as object
 
     rows.push(navRow("recap", tr("Recap"), tr("What you watched recently"), "insights", true))
 
+    rows.push(navRow("loadout", tr("Loadout"), tr("Score to spend and the boosts you hold"), "backpack", true))
+
     libraries = m.overview.libraryCompletion.count()
     if libraries > 0
         rows.push(navRow("library", tr("Library completion"), substitute(tr("{0} libraries"), libraries.toStr()), "collections_bookmark", true))
@@ -673,6 +696,81 @@ function chaseRow(item as object) as object
         height: 120
     }
 end function
+
+' The panel names the three consumables itself, since the plugin only describes them in English
+function powerUpText(powerUpType as string) as object
+    if powerUpType = "XpBoost"
+        return { name: tr("XP Boost"), body: tr("Doubles score for an hour. Using it again restarts the hour.") }
+    end if
+
+    if powerUpType = "DoubleCredit"
+        return { name: tr("Double Credit"), body: tr("The next thing you finish counts twice towards badges.") }
+    end if
+
+    if powerUpType = "StreakFreeze"
+        return { name: tr("Streak Freeze"), body: tr("Covers one missed day. Only one can be banked.") }
+    end if
+
+    return { name: powerUpType, body: "" }
+end function
+
+function heldLabel(count as integer) as string
+    if count <= 0 then return tr("None held")
+    if count = 1 then return tr("1 held")
+
+    return substitute(tr("{0} held"), count.toStr())
+end function
+
+function loadoutRows() as object
+    rows = []
+    if not isValid(m.powerUps) then return rows
+
+    rows.push(headingRow(tr("Score bank")))
+    rows.push(headingRow(substitute(tr("{0} points"), m.powerUps.bank.toStr())))
+
+    rows.push(headingRow(tr("Power-ups")))
+    for each slot in m.powerUps.slots
+        rows.push(powerUpRow(slot))
+    end for
+
+    ' A heading is not a focus stop and the list only scrolls as far as focus goes, so what the
+    ' plugin said is a row of its own to keep it reachable
+    if m.powerUpProblem <> "" then rows.push({ kind: "note", title: m.powerUpProblem, height: 120 })
+
+    return rows
+end function
+
+' The row keeps its press only while there is one to spend, but it is never dimmed, since holding
+' none is already said underneath and a greyed row is harder to read from a sofa
+function powerUpRow(slot as object) as object
+    text = powerUpText(slot.type)
+    held = heldLabel(slot.count)
+
+    row = {
+        kind: "powerup",
+        powerUpType: slot.type,
+        offered: slot.count > 0 and not m.powerUpBusy,
+        title: text.name,
+        caption: text.body,
+        icon: slot.icon,
+        tint: m.accent,
+        progressText: slot.active ? `${held} · ${tr("Running now")}` : held,
+        height: 150
+    }
+
+    if slot.active then row.progressColor = m.accent
+
+    return row
+end function
+
+sub openLoadout()
+    m.powerUps = invalid
+    m.powerUpProblem = ""
+    ' The screen opens on its loading line rather than flashing an empty loadout
+    m.loading = true
+    pushView("loadout")
+    startLoad({ kind: "powerups" })
+end sub
 
 function questRows() as object
     rows = []
@@ -867,42 +965,76 @@ sub openChaseItem(row as object)
     m.top.selectedItem = node
 end sub
 
-' ===== Rerolls =====
+' ===== Spending =====
 
-' Spending a reroll is worth asking about, since there is no way back
+' Spending something the viewer only gets so many of is worth asking about, since there is no
+' way back
+sub askSpend(title as string, message as string, chosen as string)
+    m.spendIndex = m.rowList.itemFocused
+
+    m.spendPrompt = CreateObject("roSGNode", "ListPromptDialog")
+    m.spendPrompt.dialogTitle = title
+    m.spendPrompt.message = message
+    m.spendPrompt.options = [tr("Cancel"), tr("Confirm")]
+    m.spendPrompt.returnFocus = m.rowList
+    m.spendPrompt.observeField("optionSelected", chosen)
+
+    m.top.getScene().appendChild(m.spendPrompt)
+    m.spendPrompt.callFunc("showDialog")
+end sub
+
+sub closeSpendPrompt()
+    if not isValid(m.spendPrompt) then return
+
+    m.spendPrompt.unobserveField("optionSelected")
+    m.top.getScene().removeChild(m.spendPrompt)
+    m.spendPrompt = invalid
+end sub
+
 sub askReroll(weekly as boolean)
     m.rerollWeekly = weekly
-    m.rerollIndex = m.rowList.itemFocused
-
-    m.rerollPrompt = CreateObject("roSGNode", "ListPromptDialog")
-    m.rerollPrompt.dialogTitle = tr("Reroll these quests?")
-    m.rerollPrompt.message = tr("You get one daily and one weekly reroll, and this spends it.")
-    m.rerollPrompt.options = [tr("Cancel"), tr("Confirm")]
-    m.rerollPrompt.returnFocus = m.rowList
-    m.rerollPrompt.observeField("optionSelected", "onRerollChosen")
-
-    m.top.getScene().appendChild(m.rerollPrompt)
-    m.rerollPrompt.callFunc("showDialog")
+    askSpend(tr("Reroll these quests?"), tr("You get one daily and one weekly reroll, and this spends it."), "onRerollChosen")
 end sub
 
 sub onRerollChosen(event as object)
     chosen = event.getData()
-    closeRerollPrompt()
+    closeSpendPrompt()
     if chosen <> 1 then return
 
     m.rerollBusy = true
     m.rerollFailed = false
     render()
-    focusRow(m.rerollIndex)
+    focusRow(m.spendIndex)
     startLoad({ kind: "reroll", weekly: m.rerollWeekly })
 end sub
 
-sub closeRerollPrompt()
-    if not isValid(m.rerollPrompt) then return
+sub askUsePowerUp(powerUpType as string)
+    m.powerUpType = powerUpType
+    askSpend(tr("Use this power-up?"), tr("It's spent as soon as you confirm."), "onUsePowerUpChosen")
+end sub
 
-    m.rerollPrompt.unobserveField("optionSelected")
-    m.top.getScene().removeChild(m.rerollPrompt)
-    m.rerollPrompt = invalid
+sub onUsePowerUpChosen(event as object)
+    chosen = event.getData()
+    closeSpendPrompt()
+    if chosen <> 1 then return
+
+    m.powerUpBusy = true
+    m.powerUpProblem = ""
+    render()
+    focusRow(m.spendIndex)
+    startLoad({ kind: "usePowerUp", powerUpType: m.powerUpType })
+end sub
+
+' Spending one costs no score, so only the inventory moves
+sub applySpend(result as object)
+    m.powerUpBusy = false
+    if result.outcome = POWER_UP_USED
+        if isValid(m.powerUps) then m.powerUps.slots = result.slots
+        return
+    end if
+
+    m.powerUpProblem = tr("Could not use that power-up.")
+    if result.outcome = POWER_UP_REFUSED and isValidAndNotEmpty(result.message) then m.powerUpProblem = result.message
 end sub
 
 ' The server is the authority on what is left, so its answer settles the row whether it handed
@@ -1023,7 +1155,11 @@ sub onRowSelected()
 
     row = m.rows[index]
     if row.kind = "nav"
-        if isValidAndNotEmpty(row.view) then pushView(row.view)
+        if row.view = "loadout"
+            openLoadout()
+        else if isValidAndNotEmpty(row.view)
+            pushView(row.view)
+        end if
         return
     end if
 
@@ -1034,6 +1170,11 @@ sub onRowSelected()
 
     if row.kind = "chase"
         openChaseItem(row)
+        return
+    end if
+
+    if row.kind = "powerup"
+        if row.offered then askUsePowerUp(row.powerUpType)
         return
     end if
 
@@ -1057,12 +1198,13 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
-    if m.onRetry
+    if m.retryKind <> ""
         if key = KeyCode.OK
-            startLoad({ kind: "overview" })
+            startLoad({ kind: m.retryKind })
             return true
         end if
         if key = KeyCode.BACK
+            if popView() then return true
             m.top.closed = true
             return true
         end if

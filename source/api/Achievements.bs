@@ -7,8 +7,8 @@ import "pkg:/source/utils/misc.bs"
 '
 ' Nothing here throws. A server without the plugin answers 404 on every route, and a panel that
 ' asked for everything at once and got nothing back wants an empty screen rather than a pile of
-' errors, so a failed call reads as no answer. Nothing here polls, and the login ping and the
-' quest reroll are the only writes.
+' errors, so a failed call reads as no answer. Nothing here polls, and the login ping, the quest
+' reroll and spending a power-up are the only writes.
 
 const ACHIEVEMENTS_ROOT = "/Plugins/AchievementBadges"
 ' What the panel opens on, so the screen that can change it knows what it was handed
@@ -62,13 +62,12 @@ namespace achievements
         }
     end function
 
-    ' The status travels back with the body, since the reroll is the one call that has to tell a
-    ' refusal from a fault and the shared helpers throw the status away
-    function Post(path as string) as object
-        answer = { status: 0, data: invalid }
-
+    ' Writes to a path and tells a refusal apart from a fault. refusedWith is the status the
+    ' plugin answers when it means no, so that one comes back with whatever the plugin said, and
+    ' anything else reads as a plain failure.
+    function Post(path as string, refusedWith = 0 as integer) as object
         req = APIRequest(`${ACHIEVEMENTS_ROOT}/${path}`)
-        if not isValid(req) then return answer
+        if not isValid(req) then return {}
 
         started = diagnostics.StartTrace("POST", req)
         req.SetRequest("POST")
@@ -79,15 +78,21 @@ namespace achievements
         event = wait(30000, req.GetMessagePort())
         if type(event) <> "roUrlEvent"
             diagnostics.EndTrace(started, "timed out", diagnostics.LEVEL_ERROR)
-            return answer
+            return {}
         end if
 
-        answer.status = event.GetResponseCode()
-        diagnostics.EndTrace(started, answer.status.ToStr(), answer.status = 200 ? diagnostics.LEVEL_DEBUG : diagnostics.LEVEL_WARN)
+        status = event.GetResponseCode()
+        answered = status >= 200 and status < 300
+        diagnostics.EndTrace(started, status.ToStr(), answered ? diagnostics.LEVEL_DEBUG : diagnostics.LEVEL_WARN)
 
-        body = event.GetString()
-        if body <> "" then answer.data = ParseJson(body)
-        return answer
+        body = invalid
+        text = event.GetString()
+        if text <> "" then body = ParseJson(text)
+
+        if answered then return { body: achievementsModel.IsObject(body) ? body : invalid }
+        if status <> refusedWith then return {}
+
+        return { refused: true, message: achievementsModel.AsString(achievementsModel.Field(body, "Message")) }
     end function
 
     ' What keeps a daily login streak alive. Nothing reads the answer.
@@ -104,13 +109,40 @@ namespace achievements
         if not isValidAndNotEmpty(userId) then return { outcome: REROLL_FAILED }
 
         questSet = weekly ? "weekly" : "daily"
-        answer = Post(`users/${userId}/quests/${questSet}/reroll`)
+        written = Post(`users/${userId}/quests/${questSet}/reroll`, 429)
 
-        if answer.status = 429 then return { outcome: REROLL_ALREADY_USED }
-        if not achievementsModel.IsObject(answer.data) then return { outcome: REROLL_FAILED }
+        if written.refused = true then return { outcome: REROLL_ALREADY_USED }
+        if not achievementsModel.IsObject(written.body) then return { outcome: REROLL_FAILED }
 
-        fresh = achievementsModel.ParseRerolledQuests(answer.data)
+        fresh = achievementsModel.ParseRerolledQuests(written.body)
         return { outcome: REROLLED, quests: fresh.quests, rerollsLeft: fresh.rerollsLeft }
+    end function
+
+    function FetchPowerUps() as dynamic
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return invalid
+
+        json = GetMap(`users/${userId}/powerups`)
+        if not isValid(json) then return invalid
+
+        return achievementsModel.ParsePowerUpState(json)
+    end function
+
+    ' Spends one power-up. The plugin refuses with 400 when the slot is empty or the boost is
+    ' already running, and its own wording explains which better than a guess here would.
+    function UsePowerUp(powerUpType as string) as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) or not isValidAndNotEmpty(powerUpType) then return { outcome: POWER_UP_FAILED }
+
+        written = Post(`users/${userId}/powerups/use/${powerUpType}`, 400)
+
+        if written.refused = true then return { outcome: POWER_UP_REFUSED, message: written.message }
+        if not achievementsModel.IsObject(written.body) then return { outcome: POWER_UP_FAILED }
+
+        return {
+            outcome: POWER_UP_USED,
+            slots: achievementsModel.ParsePowerUpSlots(achievementsModel.Field(written.body, "Inventory"))
+        }
     end function
 
     function FetchLeaderboard(category = "" as string, limit = 10 as integer) as object

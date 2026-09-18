@@ -12,6 +12,11 @@ const REROLLED = "rerolled"
 const REROLL_ALREADY_USED = "alreadyUsed"
 const REROLL_FAILED = "failed"
 
+' How spending a power-up ended. A refusal is the plugin saying no, not a fault.
+const POWER_UP_USED = "used"
+const POWER_UP_REFUSED = "refused"
+const POWER_UP_FAILED = "failed"
+
 namespace achievementsModel
 
     function IsObject(value as dynamic) as boolean
@@ -256,6 +261,33 @@ namespace achievementsModel
             current: AsInt(Field(progress, "Current")),
             target: AsInt(Field(progress, "Target")),
             items: MapList(Field(json, "Items"), achievementsModel.ParseChaseItem)
+        }
+    end function
+
+    ' One consumable the viewer holds. The plugin also sends a name and a description, both
+    ' English only, so the panel names the three types itself and takes just the icon.
+    function ParsePowerUpSlot(json as object) as object
+        return {
+            ' XpBoost, DoubleCredit or StreakFreeze, which is also what the use route takes
+            type: AsString(Field(json, "Type")),
+            icon: AsString(Field(json, "Icon")),
+            count: AsInt(Field(json, "Count")),
+            ' Running, pending or banked, depending on which consumable this is
+            active: AsBool(Field(json, "Active"))
+        }
+    end function
+
+    ' The inventory array, which both the read and the spend answer with
+    function ParsePowerUpSlots(value as dynamic) as object
+        return MapList(value, achievementsModel.ParsePowerUpSlot)
+    end function
+
+    ' The score bank and what it has already bought. The bank is score left to spend, which is
+    ' not the same as the score a rank is measured on.
+    function ParsePowerUpState(json as object) as object
+        return {
+            bank: AsInt(Field(json, "ScoreBank")),
+            slots: ParsePowerUpSlots(Field(json, "Inventory"))
         }
     end function
 
