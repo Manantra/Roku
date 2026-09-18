@@ -1,0 +1,421 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Which summary cards an item gets, in what order, and what each one opens.
+'
+' A card is an AA: id, title, optional modalTitle, subtitle, imageUrl, iconKey and
+' sections. A section is an AA: kind, title, count, items and options.
+
+
+' "1h 32m", "2h", or "48m". The shared formatter says "2h 0m" for a round number
+' of hours, which reads badly in a subtitle.
+function spotlightRuntimeLabel(ticks as dynamic) as string
+    totalMinutes = 0
+    if isValid(ticks) then totalMinutes = int(ticks / 600000000)
+    hours = int(totalMinutes / 60)
+    minutes = totalMinutes mod 60
+    if hours > 0 and minutes > 0 then return hours.toStr() + "h " + minutes.toStr() + "m"
+    if hours > 0 then return hours.toStr() + "h"
+    return minutes.toStr() + "m"
+end function
+
+function spotlightCountLabel(count as integer, one as string, many as string) as string
+    if count = 1 then return one
+    return many.replace("{count}", count.toStr())
+end function
+
+function spotlightJoinSubtitle(parts as object) as string
+    joined = ""
+    for each part in parts
+        if isValidAndNotEmpty(part)
+            if isValidAndNotEmpty(joined) then joined += " · "
+            joined += part
+        end if
+    end for
+    return joined
+end function
+
+' A cast list can name the same person twice, once as an actor and once as a
+' guest star, so the repeats are folded into one entry carrying both roles.
+function spotlightDedupePeople(people as object) as object
+    out = []
+    byKey = {}
+    if not isValidAndNotEmpty(people) then return out
+
+    for each person in people
+        if not isValid(person) then continue for
+        key = ""
+        if isValid(person.id) then key = person.id.toStr()
+        if not isValidAndNotEmpty(key) and isValidAndNotEmpty(chainLookupReturn(person, "json.Name", "")) then key = person.json.Name
+        if not isValidAndNotEmpty(key) then continue for
+
+        held = byKey[key]
+        if isValid(held)
+            ' Fold the roles of a repeat entry into the one already kept
+            for each role in [held.subTitle, person.subTitle]
+                if isValidAndNotEmpty(role) and held.subTitle.Instr(role) < 0
+                    if isValidAndNotEmpty(held.subTitle) then held.subTitle += " · "
+                    held.subTitle += role
+                end if
+            end for
+        else
+            byKey[key] = person
+            out.push(person)
+        end if
+    end for
+    return out
+end function
+
+' Which artwork a summary card leads with. Library items ask the server, Seerr
+' items carry their TMDB url already. The extras loader fills posterURL on most
+' nodes it hands over, so that is the first thing read.
+function spotlightItemImageUrl(serverUrl as string, item as object) as string
+    if not isValid(item) then return ""
+
+    if isValidAndNotEmpty(chainLookupReturn(item, "_externalPosterUrl", "")) then return item._externalPosterUrl
+    if isValidAndNotEmpty(item.posterURL) then return item.posterURL
+
+    if isValidAndNotEmpty(item.id) then return ImageURL(item.id, "Primary", { "maxHeight": 360, "quality": 90 })
+    return ""
+end function
+
+' A landscape thumbnail, taking 16:9 art over a poster. Thumb first, then the
+' item's own backdrop, then the one it inherits from its parent.
+function spotlightLandscapeImageUrl(serverUrl as string, item as object) as string
+    if not isValid(item) then return ""
+
+    if isValidAndNotEmpty(chainLookupReturn(item, "_externalBackdropUrl", "")) then return item._externalBackdropUrl
+
+    thumb = chainLookupReturn(item, "json.ImageTags.Thumb", "")
+    if isValidAndNotEmpty(thumb) then return ImageURL(item.id, "Thumb", { "maxWidth": 640, "quality": 90, "tag": thumb })
+
+    backdropTags = chainLookupReturn(item, "json.BackdropImageTags", invalid)
+    if isValid(backdropTags) and backdropTags.count() > 0
+        return ImageURL(item.id, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": backdropTags[0] })
+    end if
+
+    parentBackdropId = chainLookupReturn(item, "json.ParentBackdropItemId", "")
+    parentBackdropTags = chainLookupReturn(item, "json.ParentBackdropImageTags", invalid)
+    if isValidAndNotEmpty(parentBackdropId) and isValid(parentBackdropTags) and parentBackdropTags.count() > 0
+        return ImageURL(parentBackdropId, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": parentBackdropTags[0] })
+    end if
+
+    return spotlightItemImageUrl(serverUrl, item)
+end function
+
+function spotlightFirstPosterUrl(serverUrl as string, items as object) as string
+    if not isValidAndNotEmpty(items) then return ""
+    for each item in items
+        url = spotlightItemImageUrl(serverUrl, item)
+        if isValidAndNotEmpty(url) then return url
+    end for
+    return ""
+end function
+
+function spotlightFirstLandscapeUrl(serverUrl as string, items as object) as string
+    if not isValidAndNotEmpty(items) then return ""
+    for each item in items
+        url = spotlightLandscapeImageUrl(serverUrl, item)
+        if isValidAndNotEmpty(url) then return url
+    end for
+    return ""
+end function
+
+' Each card is built as an AA the screen can render directly.
+function spotlightCardsFor(state as object) as object
+    builder = spotlightCardBuilder(state)
+    return builder.build()
+end function
+function spotlightCardBuilder(state as object) as object
+    ' Every entry here is a builder that reads s off m, so they are dispatched
+    ' as members of this object rather than called by name. Calling one by name
+    ' would bind m to the screen, whose s does not exist.
+    return {
+        s: state,
+        build: spotlightBuilderBuild,
+        factories: spotlightBuilderFactories,
+        makeCard: spotlightBuilderMakeCard,
+        peopleCard: spotlightBuilderPeopleCard,
+        similarCard: spotlightBuilderSimilarCard,
+        seasonsCard: spotlightBuilderSeasonsCard,
+        episodesCard: spotlightBuilderEpisodesCard,
+        tracksCard: spotlightBuilderTracksCard,
+        playlistCard: spotlightBuilderPlaylistCard,
+        albumsCard: spotlightBuilderAlbumsCard,
+        boxSetItemsCard: spotlightBuilderBoxSetItemsCard
+    }
+end function
+
+' The card ids this item qualifies for, in the order the band draws them. An array
+' on purpose, because an associative array iterates in hash order and scrambles the
+' band. An id whose builder is still missing is skipped by build.
+function spotlightBuilderFactories() as object
+    s = m.s
+    if isValid(s.seerrOnly) and s.seerrOnly = true
+        return ["people", "similar"]
+    end if
+
+    itemType = LCase(chainLookupReturn(s.item, "json.Type", chainLookupReturn(s.item, "Type", "")))
+    if itemType = "series"
+        return ["seasons", "people", "chapters_extras", "similar", "collections"]
+    else if itemType = "season"
+        return ["episodes", "people", "chapters_extras", "similar"]
+    else if itemType = "episode"
+        return ["episodes", "people", "chapters_extras", "similar"]
+    else if itemType = "musicalbum" or itemType = "audiobook" or itemType = "book"
+        return ["tracks", "similar"]
+    else if itemType = "playlist"
+        return ["playlist"]
+    else if itemType = "musicartist"
+        return ["albums", "similar"]
+    else if itemType = "person"
+        return ["filmography"]
+    else if itemType = "boxset"
+        return ["boxset_items", "people", "playlist_order"]
+    end if
+    return ["people", "chapters_extras", "similar", "collections"]
+end function
+
+function spotlightBuilderBuild() as object
+    factories = m.factories()
+    cards = []
+    for each key in factories
+        card = m.makeCard(key)
+        if isValid(card) then cards.push(card)
+    end for
+    return cards
+end function
+
+function spotlightBuilderMakeCard(id as string) as dynamic
+    if id = "people" then return m.peopleCard()
+    if id = "similar" then return m.similarCard()
+    if id = "seasons" then return m.seasonsCard()
+    if id = "episodes" then return m.episodesCard()
+    if id = "tracks" then return m.tracksCard()
+    if id = "playlist" then return m.playlistCard()
+    if id = "albums" then return m.albumsCard()
+    if id = "boxset_items" then return m.boxSetItemsCard()
+    return invalid
+end function
+
+' The people behind the item, plus its studios
+function spotlightBuilderPeopleCard() as dynamic
+    s = m.s
+    castItems = s.cast
+    crewItems = s.crew
+    if not isValidAndNotEmpty(castItems) and not isValidAndNotEmpty(crewItems) then return invalid
+
+    people = spotlightDedupePeople(castItems)
+    if people.count() = 0 and crewItems.count() = 0 then return invalid
+
+    peopleCount = people.count()
+    return {
+        id: "people",
+        title: tr("Cast, Crew, and Studios"),
+        subtitle: spotlightCountLabel(peopleCount, tr("1 person"), tr("{count} people")),
+        imageUrl: s.fallbackImageUrl,
+        iconKey: "people",
+        sections: [
+            { kind: "people", title: tr("Cast"), count: people.count(), items: people },
+            { kind: "people", title: tr("Crew"), count: crewItems.count(), items: crewItems }
+        ]
+    }
+end function
+
+' The similar card: library similar items first, then what Seerr recommends and
+' holds as similar. Named for where the list actually came from.
+function spotlightBuilderSimilarCard() as dynamic
+    s = m.s
+    similar = s.similar
+    recommendations = []
+    seerrSimilar = []
+    if isValidAndNotEmpty(s.seerrRecommendations) then recommendations = s.seerrRecommendations
+    if isValidAndNotEmpty(s.seerrSimilar) then seerrSimilar = s.seerrSimilar
+    if similar.count() = 0 and recommendations.count() = 0 and seerrSimilar.count() = 0 then return invalid
+
+    if isValidAndNotEmpty(s.similarSource) and s.similarSource = "moonfin"
+        libraryTitle = tr("Moonfin Recommends")
+    else if isValidAndNotEmpty(s.similarSource) and s.similarSource = "tmdb"
+        libraryTitle = tr("TMDb")
+    else
+        libraryTitle = tr("Similar")
+    end if
+
+    total = similar.count() + recommendations.count() + seerrSimilar.count()
+    cardSections = []
+    if similar.count() > 0 then cardSections.push({ kind: "media", title: libraryTitle, count: similar.count(), items: similar, aspect: "portrait" })
+    if recommendations.count() > 0 then cardSections.push({ kind: "seerr", title: tr("Recommendations (Seerr)"), count: recommendations.count(), items: recommendations })
+    if seerrSimilar.count() > 0
+        seerrTitle = similar.count() > 0 ? tr("Similar (Seerr)") : tr("Similar")
+        cardSections.push({ kind: "seerr", title: seerrTitle, count: seerrSimilar.count(), items: seerrSimilar })
+    end if
+
+    cardImage = ""
+    if similar.count() > 0
+        cardImage = spotlightLandscapeImageUrl(s.serverUrl, similar[0])
+    else if recommendations.count() > 0
+        cardImage = spotlightFirstLandscapeUrl(s.serverUrl, recommendations)
+    else if seerrSimilar.count() > 0
+        cardImage = spotlightFirstLandscapeUrl(s.serverUrl, seerrSimilar)
+    end if
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "similar",
+        title: tr("Recommendations"),
+        subtitle: spotlightCountLabel(total, tr("1 title"), tr("{count} titles")),
+        imageUrl: cardImage,
+        sections: cardSections
+    }
+end function
+
+function spotlightBuilderSeasonsCard() as dynamic
+    s = m.s
+    seasonItems = s.seasons
+    if seasonItems.count() = 0 then return invalid
+
+    episodeCount = s.seriesEpisodes.count()
+    if episodeCount = 0 then episodeCount = chainLookupReturn(s.item, "json.RecursiveItemCount", 0)
+
+    showName = ""
+    itemName = chainLookupReturn(s.item, "json.Name", "")
+    if isValidAndNotEmpty(itemName) then showName = itemName
+
+    cardSections = [{ kind: "media", title: tr("Seasons"), count: seasonItems.count(), items: seasonItems, aspect: "portrait" }]
+    subtitleParts = [spotlightCountLabel(seasonItems.count(), tr("1 season"), tr("{count} seasons"))]
+    if episodeCount > 0 then subtitleParts.push(spotlightCountLabel(episodeCount, tr("1 episode"), tr("{count} episodes")))
+
+    cardImage = spotlightFirstPosterUrl(s.serverUrl, seasonItems)
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "seasons",
+        title: tr("Seasons"),
+        modalTitle: isValidAndNotEmpty(showName) ? showName : tr("Seasons"),
+        subtitle: spotlightJoinSubtitle(subtitleParts),
+        imageUrl: cardImage,
+        sections: cardSections
+    }
+end function
+
+function spotlightBuilderEpisodesCard() as dynamic
+    s = m.s
+    episodeItems = s.episodes
+    if episodeItems.count() = 0 then episodeItems = s.seriesEpisodes
+    if episodeItems.count() = 0 then return invalid
+
+    seriesName = chainLookupReturn(s.item, "json.SeriesName", "")
+    itemName = chainLookupReturn(s.item, "json.Name", "")
+    cardModalTitle = itemName
+    if isValidAndNotEmpty(seriesName) then cardModalTitle = seriesName + " - " + itemName
+
+    cardImage = spotlightFirstPosterUrl(s.serverUrl, episodeItems)
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "episodes",
+        title: tr("Episodes"),
+        modalTitle: cardModalTitle,
+        subtitle: spotlightCountLabel(episodeItems.count(), tr("1 episode"), tr("{count} episodes")),
+        imageUrl: cardImage,
+        sections: [{ kind: "media", title: tr("Episodes"), count: episodeItems.count(), items: episodeItems, aspect: "landscape" }]
+    }
+end function
+
+function spotlightBuilderTracksCard() as dynamic
+    s = m.s
+    tracks = s.albumTracks
+    if tracks.count() = 0 then return invalid
+
+    totalTicks = 0
+    for each track in tracks
+        if isValid(track.json) and isValid(track.json.RunTimeTicks) then totalTicks += track.json.RunTimeTicks
+    end for
+
+    subtitleParts = [spotlightCountLabel(tracks.count(), tr("1 track"), tr("{count} tracks"))]
+    if totalTicks > 0 then subtitleParts.push(spotlightRuntimeLabel(totalTicks))
+
+    itemType = LCase(chainLookupReturn(s.item, "json.Type", ""))
+    return {
+        id: "tracks",
+        title: tr("Track List"),
+        subtitle: spotlightJoinSubtitle(subtitleParts),
+        imageUrl: spotlightItemImageUrl(s.serverUrl, s.item),
+        sections: [{ kind: "tracks", title: tr("Track List"), count: tracks.count(), items: tracks, groupByDisc: itemType = "musicalalbum" }]
+    }
+end function
+
+function spotlightBuilderPlaylistCard() as dynamic
+    s = m.s
+    playlistTracks = s.playlistItems
+    if playlistTracks.count() = 0 then return invalid
+
+    cardImage = spotlightItemImageUrl(s.serverUrl, playlistTracks[0])
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "playlist",
+        title: tr("Playlist"),
+        subtitle: spotlightCountLabel(playlistTracks.count(), tr("1 item"), tr("{count} items")),
+        imageUrl: cardImage,
+        sections: [{ kind: "tracks", title: tr("Playlist"), count: playlistTracks.count(), items: playlistTracks }]
+    }
+end function
+
+function spotlightBuilderAlbumsCard() as dynamic
+    s = m.s
+    albumItems = s.artistAlbums
+    if albumItems.count() = 0 then return invalid
+
+    cardImage = spotlightFirstPosterUrl(s.serverUrl, albumItems)
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "albums",
+        title: tr("Albums"),
+        subtitle: spotlightCountLabel(albumItems.count(), tr("1 album"), tr("{count} albums")),
+        imageUrl: cardImage,
+        sections: [{ kind: "media", title: tr("Albums"), count: albumItems.count(), items: albumItems, aspect: "square" }]
+    }
+end function
+
+function spotlightBuilderBoxSetItemsCard() as dynamic
+    s = m.s
+    boxItems = s.collectionItems
+    if boxItems.count() = 0 then return invalid
+
+    movies = []
+    seriesList = []
+    rest = []
+    for each boxItem in boxItems
+        itemType = LCase(chainLookupReturn(boxItem, "json.Type", "") ?? "")
+        if itemType = "movie"
+            movies.push(boxItem)
+        else if itemType = "series"
+            seriesList.push(boxItem)
+        else
+            rest.push(boxItem)
+        end if
+    end for
+
+    subtitleParts = []
+    if movies.count() > 0 then subtitleParts.push(spotlightCountLabel(movies.count(), tr("1 movie"), tr("{count} movies")))
+    if seriesList.count() > 0 then subtitleParts.push(spotlightCountLabel(seriesList.count(), tr("1 show"), tr("{count} shows")))
+    if movies.count() = 0 and seriesList.count() = 0 then subtitleParts.push(spotlightCountLabel(boxItems.count(), tr("1 item"), tr("{count} items")))
+
+    cardSections = []
+    if movies.count() > 0 then cardSections.push({ kind: "media", title: tr("Movies"), count: movies.count(), items: movies, aspect: "portrait" })
+    if seriesList.count() > 0 then cardSections.push({ kind: "media", title: tr("TV Shows"), count: seriesList.count(), items: seriesList, aspect: "portrait" })
+    if rest.count() > 0 then cardSections.push({ kind: "media", title: tr("Movies & Shows"), count: rest.count(), items: rest, aspect: "portrait" })
+
+    cardImage = spotlightFirstLandscapeUrl(s.serverUrl, boxItems)
+    if not isValidAndNotEmpty(cardImage) then cardImage = s.fallbackImageUrl
+
+    return {
+        id: "boxset_items",
+        title: tr("Movies & Shows"),
+        subtitle: spotlightJoinSubtitle(subtitleParts),
+        imageUrl: cardImage,
+        sections: cardSections
+    }
+end function

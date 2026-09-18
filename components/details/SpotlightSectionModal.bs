@@ -1,0 +1,206 @@
+import "pkg:/components/details/SpotlightCards.bs"
+import "pkg:/components/details/SpotlightSummaryCard.bs"
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+' An open card as a panel over the page, with every section it holds stacked down
+' one scrolling body.
+
+const MODAL_BODY_WIDTH = 1526
+const MODAL_BODY_HEIGHT = 790
+const MODAL_SECTION_GAP = 28
+const MODAL_HEADING_HEIGHT = 46
+
+sub init()
+    m.body = m.top.findNode("modalBody")
+    m.scrollAnim = m.top.findNode("modalScrollAnim")
+    m.scrollInterp = m.top.findNode("modalScrollInterp")
+
+    m.sections = []
+    m.focusedSection = -1
+    m.scrollY = 0
+end sub
+
+' How each kind of section draws, taken from the grids the other detail screens use.
+' A media section also says which shape it wants, and the card draws from the width
+' stamped on its own content, so the two are kept in step here.
+function sectionGridSpec(kind as string, aspect as string) as object
+    if kind = "people" then return { component: "DetailCastCard", width: 160, height: 265, gap: 30 }
+    if kind = "studios" then return { component: "StudioCard", width: 240, height: 166, gap: 30 }
+    if kind = "chapters" then return { component: "ChapterCard", width: 300, height: 206, gap: 30 }
+    if kind = "tracks" then return { component: "PlaylistItemRow", width: MODAL_BODY_WIDTH, height: 120, gap: 8 }
+    ' A Seerr title carries no library json, so it draws with the card Seerr rows use
+    if kind = "seerr" then return { component: "SeerrPoster", width: 180, height: 370, gap: 30 }
+
+    ' Episodes run wide, and stay above the width where the card spells out the
+    ' episode number and its runtime rather than a name and a role
+    if aspect = "landscape" then return { component: "ExtrasItem", width: 450, height: 320, gap: 30, posterWidth: 450 }
+
+    return { component: "ExtrasItem", width: 200, height: 380, gap: 30, posterWidth: 200 }
+end function
+
+sub onCardChanged()
+    card = m.top.card
+    if not isValid(card) then return
+
+    title = m.top.findNode("modalHeaderTitle")
+    if isValid(title)
+        modalTitle = chainLookupReturn(card, "modalTitle", "")
+        if not isValidAndNotEmpty(modalTitle) then modalTitle = chainLookupReturn(card, "title", "")
+        title.text = modalTitle
+    end if
+
+    icon = m.top.findNode("modalHeaderIcon")
+    if isValid(icon)
+        iconUri = spotlightCardIconUri(chainLookupReturn(card, "iconKey", ""))
+        if isValidAndNotEmpty(iconUri) then icon.uri = iconUri
+    end if
+
+    buildSections(chainLookupReturn(card, "sections", []))
+end sub
+
+sub buildSections(sections as object)
+    m.body.removeChildrenIndex(m.body.getChildCount(), 0)
+    m.sections = []
+    m.focusedSection = -1
+    m.scrollY = 0
+    m.body.translation = [0, 0]
+
+    if not isValidAndNotEmpty(sections) then return
+
+    y = 0
+    for each section in sections
+        items = chainLookupReturn(section, "items", [])
+        if not isValidAndNotEmpty(items) then continue for
+
+        heading = m.body.createChild("Label")
+        heading.font = "font:MediumSystemFont"
+        heading.color = "#FFFFFF"
+        heading.translation = [0, y]
+        headingText = chainLookupReturn(section, "title", "")
+        count = chainLookupReturn(section, "count", items.count())
+        if isValidAndNotEmpty(headingText)
+            heading.text = count > 0 ? `${headingText} (${count.toStr()})` : headingText
+        end if
+        y += MODAL_HEADING_HEIGHT
+
+        spec = sectionGridSpec(chainLookupReturn(section, "kind", "media"), chainLookupReturn(section, "aspect", "portrait"))
+        columns = int((MODAL_BODY_WIDTH + spec.gap) / (spec.width + spec.gap))
+        if columns < 1 then columns = 1
+        rows = int((items.count() + columns - 1) / columns)
+        if rows < 1 then rows = 1
+
+        grid = m.body.createChild("MarkupGrid")
+        grid.itemComponentName = spec.component
+        grid.numColumns = columns
+        grid.numRows = rows
+        grid.itemSize = [spec.width, spec.height]
+        grid.rowHeights = [spec.height]
+        grid.itemSpacing = [spec.gap, spec.gap]
+        grid.vertFocusAnimationStyle = "fixedFocus"
+        grid.drawFocusFeedback = false
+        grid.translation = [0, y]
+        grid.content = spotlightContentFromItems(items, chainLookupReturn(spec, "posterWidth", 0))
+        grid.observeField("itemSelected", "onGridItemSelected")
+
+        gridHeight = rows * spec.height + (rows - 1) * spec.gap
+        m.sections.push({ grid: grid, top: y - MODAL_HEADING_HEIGHT, columns: columns, rows: rows })
+        y += gridHeight + MODAL_SECTION_GAP
+    end for
+
+    if m.sections.count() > 0 then focusSection(0)
+end sub
+
+sub focusSection(index as integer)
+    if index < 0 or index >= m.sections.count() then return
+
+    m.focusedSection = index
+    m.sections[index].grid.setFocus(true)
+    scrollSectionIntoView(index)
+end sub
+
+' The body carries every section, so it is moved rather than each grid scrolling
+sub scrollSectionIntoView(index as integer)
+    entry = m.sections[index]
+    target = entry.top
+
+    maxScroll = 0
+    last = m.sections[m.sections.count() - 1]
+    contentHeight = last.top + MODAL_HEADING_HEIGHT + last.rows * last.grid.itemSize[1] + (last.rows - 1) * last.grid.itemSpacing[1]
+    if contentHeight > MODAL_BODY_HEIGHT then maxScroll = contentHeight - MODAL_BODY_HEIGHT
+    if target > maxScroll then target = maxScroll
+    if target < 0 then target = 0
+
+    if target = m.scrollY then return
+
+    m.scrollAnim.control = "stop"
+    m.scrollInterp.keyValue = [[0, -m.scrollY], [0, -target]]
+    m.scrollY = target
+    m.scrollAnim.control = "start"
+end sub
+
+function spotlightContentFromItems(items as object, posterWidth = 0 as integer) as object
+    content = CreateObject("roSGNode", "ContentNode")
+    for each item in items
+        if isValid(item)
+            ' The card sizes itself from this, so a season poster and an episode still
+            ' each fill the cell the section gave them
+            if posterWidth > 0 and item.hasField("imageWidth") then item.imageWidth = posterWidth
+            ' The grids here draw no feedback of their own, so each card rings its own
+            ' poster instead of the cell around it
+            if not item.hasField("ownFocusRing") then item.addFields({ ownFocusRing: true })
+            item.ownFocusRing = true
+            content.appendChild(item)
+        end if
+    end for
+    return content
+end function
+
+sub onGridItemSelected(event as object)
+    grid = event.getRoSGNode()
+    if not isValid(grid) then return
+
+    content = grid.content
+    if not isValid(content) then return
+
+    item = content.getChild(event.getData())
+    if isValid(item) then m.top.sectionItemSelected = item
+end sub
+
+' Which row of its own grid the remote sits on, so the modal knows when a press
+' should leave the section rather than move inside it
+function focusedRow(entry as object) as integer
+    index = entry.grid.itemFocused
+    if index < 0 then return 0
+    return int(index / entry.columns)
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if key = KeyCode.BACK
+        m.top.modalClosed = true
+        return true
+    end if
+
+    if m.focusedSection < 0 then return false
+    entry = m.sections[m.focusedSection]
+
+    if key = KeyCode.UP
+        if focusedRow(entry) > 0 then return false
+        if m.focusedSection > 0
+            focusSection(m.focusedSection - 1)
+            return true
+        end if
+        return true
+    else if key = KeyCode.DOWN
+        if focusedRow(entry) < entry.rows - 1 then return false
+        if m.focusedSection < m.sections.count() - 1
+            focusSection(m.focusedSection + 1)
+            return true
+        end if
+        return true
+    end if
+
+    return false
+end function

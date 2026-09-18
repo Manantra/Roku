@@ -178,6 +178,43 @@ sub populateSeriesMetadata(itemData as object)
     end if
 end sub
 
+sub populateSeasonMetadata(itemData as object)
+    episodeHeaderNode = m.top.findNode("episodeHeader")
+    if isValid(episodeHeaderNode)
+        if isValidAndNotEmpty(itemData.SeriesName)
+            episodeHeaderNode.text = itemData.SeriesName
+            episodeHeaderNode.visible = true
+        else
+            episodeHeaderNode.visible = false
+        end if
+    end if
+
+    if isValid(itemData.productionYear)
+        setFieldText("releaseYear", itemData.productionYear)
+    else if isValid(itemData.PremiereDate)
+        d = CreateObject("roDateTime")
+        d.FromISO8601String(itemData.PremiereDate)
+        setFieldText("releaseYear", stri(d.GetYear()).trim())
+    end if
+
+    epCount = 0
+    if isChainValid(itemData, "ChildCount") then epCount = itemData.ChildCount
+    if epCount = 0 and isValid(m.seasonEpisodes) then epCount = m.seasonEpisodes.count()
+    if epCount > 0
+        countText = stri(epCount).trim() + " "
+        if epCount = 1
+            countText += tr("Episode")
+        else
+            countText += tr("Episodes")
+        end if
+        setFieldText("seasonCount", countText)
+    end if
+
+    if isValid(itemData.officialRating)
+        setFieldText("officialRating", itemData.officialRating)
+    end if
+end sub
+
 sub populateRuntime(itemData as object)
     ' Series don't have runtime or an ends at value, so the season count shows instead
     if isSeries()

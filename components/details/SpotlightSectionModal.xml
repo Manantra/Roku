@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SpotlightSectionModal" extends="Group">
+  <children>
+    <!-- Full screen scrim, the page behind it is never reachable by accident -->
+    <Rectangle id="modalOverlay" width="1920" height="1080" color="#000000" opacity="0.54" />
+
+    <!-- The panel: header over a body that scrolls every section as one -->
+    <Poster id="modalPanelBg" uri="pkg:/images/details/surface17.9.png"
+      width="1574" height="918" blendColor="#121418" opacity="0.96"
+      translation="[173, 81]" />
+    <Poster id="modalPanelBorder"
+      uri="pkg:/images/details/tabborderfocus.9.png"
+      width="1574" height="918"
+      blendColor="#FFFFFF" opacity="0.12"
+      translation="[173, 81]" />
+
+    <Group id="modalPanel" translation="[173, 81]">
+      <Group id="modalHeader" translation="[24, 20]">
+        <Poster id="modalHeaderIcon" width="30" height="30" blendColor="#FFFFFFCC" />
+        <Label id="modalHeaderTitle"
+          translation="[42, -6]"
+          width="1480"
+          font="font:MediumBoldSystemFont"
+          color="#FFFFFF" />
+      </Group>
+
+      <Group id="modalViewport" translation="[24, 92]" clippingRect="[0, 0, 1526, 790]">
+        <Group id="modalBody" />
+      </Group>
+    </Group>
+
+    <Animation id="modalScrollAnim" duration="0.25" repeat="false" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="modalScrollInterp"
+        key="[0.0, 1.0]"
+        keyValue="[[0, 0], [0, 0]]"
+        fieldToInterp="modalBody.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="card" type="assocarray" onChange="onCardChanged" />
+    <field id="sectionItemSelected" type="node" alwaysNotify="true" />
+    <field id="chapterSeekTicks" type="longinteger" alwaysNotify="true" />
+    <field id="modalClosed" type="boolean" alwaysNotify="true" />
+  </interface>
+</component>

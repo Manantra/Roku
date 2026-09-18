@@ -42,7 +42,7 @@ namespace settingsSync
             { pluginKey: "mediaBarOpacity", rokuKey: "ui.overlayOpacity", type: "opacityToPercent" },
             { pluginKey: "mediaBarOverlayColor", rokuKey: "ui.overlayColor", type: "colorName" },
             { pluginKey: "shuffleContentType", rokuKey: "shuffle_content_type", type: "shuffleType" },
-            { pluginKey: "detailScreenStyle", rokuKey: "ui.itemdetail.style", type: "direct" },
+            { pluginKey: "detailScreenStyle", rokuKey: "ui.itemdetail.style", type: "detailStyle" },
             { pluginKey: "detailExpandedTabs", rokuKey: "ui.itemdetail.expandedTabs", type: "bool" },
             { pluginKey: "hideDetailsMediaDescription", rokuKey: "ui.itemdetail.hideMediaDescription", type: "bool" },
             { pluginKey: "detailUseSeriesThumbnails", rokuKey: "ui.itemdetail.useSeriesThumbnails", type: "bool" },
@@ -545,6 +545,8 @@ namespace settingsSync
     function PluginToRoku(pluginValue as dynamic, conversionType as string) as dynamic
         if conversionType = "direct"
             return pluginValue.toStr()
+        else if conversionType = "detailStyle"
+            return normalizeDetailScreenStyleToken(pluginValue)
         else if conversionType = "navbarPosition"
             return settingsSync.NavbarPosition(pluginValue)
         else if conversionType = "bool"
@@ -649,6 +651,10 @@ namespace settingsSync
 
         if conversionType = "direct"
             return rokuStr
+        else if conversionType = "detailStyle"
+            ' This client's ids are exactly the enum names the Flutter client syncs,
+            ' and Smart-TV normalizes names to its own tokens on the way in.
+            return normalizeDetailScreenStyleToken(rokuStr)
         else if conversionType = "navbarPosition"
             return settingsSync.NavbarPosition(rokuStr)
         else if conversionType = "bool"

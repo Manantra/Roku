@@ -1,0 +1,104 @@
+import "pkg:/source/utils/misc.bs"
+
+const SPOTLIGHT_CARD_TEXT_INSET = 14
+const SPOTLIGHT_CARD_ARROW_GUTTER = 40
+
+' One card in the band under the hero: the Roku port of SpotlightSummaryCard.
+' The component is focusable through its parent group, and the parent reads
+' cardData back out of the focused child to open the right modal.
+
+sub onCardDataChanged()
+    card = m.top.cardData
+    if not isValid(card) then return
+
+    title = m.top.findNode("cardTitle")
+    subtitle = m.top.findNode("cardSubtitle")
+    image = m.top.findNode("cardImage")
+    badgeIcon = m.top.findNode("cardBadgeIcon")
+
+    if isValid(title) then title.text = chainLookupReturn(card, "title", "")
+    if isValid(subtitle)
+        subText = chainLookupReturn(card, "subtitle", "")
+        subtitle.text = subText
+        subtitle.visible = isValidAndNotEmpty(subText)
+    end if
+
+    if isValid(image)
+        url = chainLookupReturn(card, "imageUrl", "")
+        if isValidAndNotEmpty(url)
+            image.uri = url
+            image.visible = true
+            if isValid(m.top.findNode("cardImageEmpty")) then m.top.findNode("cardImageEmpty").visible = false
+        else
+            image.uri = ""
+            image.visible = false
+            empty = m.top.findNode("cardImageEmpty")
+            if isValid(empty) then empty.visible = true
+        end if
+    end if
+
+    if isValid(badgeIcon)
+        iconUri = spotlightCardIconUri(chainLookupReturn(card, "iconKey", ""))
+        if isValidAndNotEmpty(iconUri)
+            badgeIcon.uri = iconUri
+            badgeIcon.visible = true
+        else
+            badgeIcon.visible = false
+        end if
+    end if
+end sub
+
+' The icon each card wears, matched to what the card holds
+function spotlightCardIconUri(iconKey as string) as string
+    if iconKey = "people" then return "pkg:/images/icons/userGroup.png"
+    if iconKey = "similar" then return "pkg:/images/icons/star.png"
+    if iconKey = "seasons" or iconKey = "episodes" then return "pkg:/images/icons/detail_series.png"
+    if iconKey = "tracks" or iconKey = "playlist" or iconKey = "albums" then return "pkg:/images/icons/cd.png"
+    if iconKey = "boxset_items" then return "pkg:/images/icons/add_to_collection.png"
+    if iconKey = "chapters_extras" then return "pkg:/images/icons/details.png"
+    return "pkg:/images/icons/detail_series.png"
+end function
+
+sub onFocusChanged2()
+    focused = m.top.focused
+    focus = m.top.findNode("cardFocus")
+    arrow = m.top.findNode("cardArrow")
+
+    if focused
+        if isValid(focus) then focus.visible = true
+        if isValid(arrow) then arrow.opacity = 1.0
+    else
+        if isValid(focus) then focus.visible = false
+        if isValid(arrow) then arrow.opacity = 0.55
+    end if
+end sub
+
+sub setCardSize()
+    size = m.top.cardSize
+    if not isValid(size) or size.count() <> 2 then return
+
+    for each id in ["cardFrame", "cardImage", "cardImageEmpty", "cardScrim", "cardFocus"]
+        node = m.top.findNode(id)
+        if isValid(node)
+            node.width = size[0]
+            node.height = size[1]
+        end if
+    end for
+
+    ' The arrow sits in the bottom right, so the text stops short of it
+    textWidth = size[0] - SPOTLIGHT_CARD_TEXT_INSET - SPOTLIGHT_CARD_ARROW_GUTTER
+    if textWidth < 0 then textWidth = 0
+
+    title = m.top.findNode("cardTitle")
+    if isValid(title)
+        title.translation = [SPOTLIGHT_CARD_TEXT_INSET, size[1] - 72]
+        title.width = textWidth
+    end if
+    subtitle = m.top.findNode("cardSubtitle")
+    if isValid(subtitle)
+        subtitle.translation = [SPOTLIGHT_CARD_TEXT_INSET, size[1] - 28]
+        subtitle.width = textWidth
+    end if
+    arrow = m.top.findNode("cardArrow")
+    if isValid(arrow) then arrow.translation = [size[0] - 34, size[1] - 34]
+end sub

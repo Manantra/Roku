@@ -182,16 +182,16 @@ sub buildCollectionBanner()
 end sub
 
 sub onRecommendationsResponse(event as object)
-    fillRow(event.getData(), m.recommendationsRow, m.recommendationsSection, m.recommendationsHeading, tr("Recommendations"))
+    fillRow(event.getData(), m.recommendationsRow, m.recommendationsSection, m.recommendationsHeading, tr("Recommendations"), "recommendationItems")
 end sub
 
 sub onSimilarResponse(event as object)
-    fillRow(event.getData(), m.similarRow, m.similarSection, m.similarHeading, tr("Similar"))
+    fillRow(event.getData(), m.similarRow, m.similarSection, m.similarHeading, tr("Similar"), "similarItems")
 end sub
 
 ' The rows carry whatever the server calls Seerr, so they read apart from the
 ' library's own More Like This row
-sub fillRow(response as object, row as object, section as object, heading as object, rowName as string)
+sub fillRow(response as object, row as object, section as object, heading as object, rowName as string, published = "" as string)
     section.visible = false
 
     if not response.success or not isValid(response.data) then return
@@ -200,13 +200,18 @@ sub fillRow(response as object, row as object, section as object, heading as obj
     if not isValid(results) or results.count() = 0 then return
 
     rowNode = CreateObject("roSGNode", "ContentNode")
+    cards = []
     for each item in results
         if rowNode.getChildCount() >= CARD_LIMIT then exit for
         card = CreateMediaContentNode(item)
-        if isValid(card) then rowNode.appendChild(card)
+        if isValid(card)
+            rowNode.appendChild(card)
+            cards.push(card)
+        end if
     end for
 
     if rowNode.getChildCount() = 0 then return
+    if published <> "" then m.top[published] = cards
 
     content = CreateObject("roSGNode", "ContentNode")
     content.appendChild(rowNode)

@@ -1,0 +1,279 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/enums/ImageType.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/utils/fontApply.bs"
+import "pkg:/source/utils/misc.bs"
+
+const META_GAP = 9
+const META_DOT_MARGIN = 12
+const META_ICON_GAP = 6
+const META_INK = "#FFFFFFBF"
+
+' Population and metadata helpers shared by the modern and Spotlight detail
+' screens. These run in the host screen's scope, so m is whichever screen
+' imported them. Extracted from ModernItemDetails.bs so the Spotlight port does
+' not fork them.
+'
+' Hooks the screen provides:
+'   function isEpisode() as boolean
+'   function isSeries() as boolean
+'   function isSeason() as boolean
+'   function isMusic() as boolean
+
+function hidesMediaDescription() as boolean
+    return moonfinPlugin.ParseBoolSetting(chainLookupReturn(m.global.session, "user.settings.`ui.itemdetail.hideMediaDescription`", false), false)
+end function
+
+' What the file is, read off the first video and audio stream the way the other
+' clients read it
+' The community and critic scores come off the item itself, so they show right
+' away beside whatever the plugin sends later.
+sub populateRatings(itemData as object)
+    m.communityRating = invalid
+    m.criticRating = invalid
+
+    if not toBoolean(m.global.session.user.settings["ui.itemdetail.showRatings"] ?? true)
+        renderRatingsRow([])
+        return
+    end if
+
+    if isValid(itemData.communityRating) and moonfinPlugin.IsRatingSourceEnabled("stars")
+        m.communityRating = {
+            source: "stars",
+            name: tr("Community"),
+            iconPath: "pkg:/images/sharp_star_white_18dp.png",
+            iconBlendColor: "#FFD700",
+            formatted: str(Int(itemData.communityRating * 10) / 10).trim()
+        }
+    end if
+
+    if isValid(itemData.CriticRating) and itemData.CriticRating > 0
+        m.criticRating = {
+            source: "tomatoes",
+            name: tr("Rotten Tomatoes"),
+            iconPath: itemData.CriticRating >= 60 ? "pkg:/images/fresh.png" : "pkg:/images/rotten.png",
+            formatted: `${itemData.CriticRating}%`
+        }
+    end if
+
+    renderRatingsRow([])
+end sub
+
+' The critic score stands in until the plugin's ratings arrive, then steps aside
+sub renderRatingsRow(pluginRatings as object)
+    ratingsRow = m.top.findNode("ratingsRow")
+    if isValid(ratingsRow)
+        ratingsRow.showNames = get_user_setting_bool("plugin.mdblist.showRatingNames", false)
+        ' Badges only choose the chrome around each rating, so off means plain rather than hidden
+        ratingsRow.showBadges = get_user_setting_bool("plugin.mdblist.showRatingBadges", true)
+    end if
+
+    entries = []
+    if isValid(m.communityRating) then entries.push(m.communityRating)
+    if isValid(m.criticRating) and pluginRatings.count() = 0 then entries.push(m.criticRating)
+    for each rating in pluginRatings
+        entries.push(rating)
+    end for
+
+    ratingsRow.ratingsData = { data: entries }
+end sub
+
+sub fetchMDBListRatings(itemData as object)
+    if not moonfinPlugin.IsRatingsEnabled() and not moonfinPlugin.IsEpisodeRatingsEnabled() then return
+
+    if isValid(m.fetchRatingsTask)
+        m.fetchRatingsTask.unobserveField("ratings")
+    end if
+
+    m.fetchRatingsTask = createObject("roSGNode", "FetchRatingsTask")
+    m.fetchRatingsTask.itemData = itemData
+    m.fetchRatingsTask.observeField("ratings", "onFetchRatingsComplete")
+    m.fetchRatingsTask.control = TaskControl.RUN
+end sub
+
+sub onFetchRatingsComplete()
+    if not isValid(m.fetchRatingsTask) then return
+
+    result = m.fetchRatingsTask.ratings
+    if not isValid(result) then return
+
+    pluginRatings = []
+    if isValidAndNotEmpty(result.data) then pluginRatings = result.data
+
+    renderRatingsRow(pluginRatings)
+    layoutContainer()
+end sub
+
+sub populateGenres(itemData as object)
+    if not isValidAndNotEmpty(itemData.genres)
+        setFieldText("metaGenres", "")
+        return
+    end if
+
+    names = []
+    for each name in itemData.genres
+        names.push(name)
+        if names.count() = 3 then exit for
+    end for
+
+    setFieldText("metaGenres", names.join(` ${fontApply.ThemeSeparator()} `))
+end sub
+
+' Which image stands in for the backdrop. The modern screen borrows the parent's
+' backdrop before it falls back to the item's own primary image
+function backdropSourceFor(itemData as object) as object
+    if isValidAndNotEmpty(itemData.BackdropImageTags)
+        return { imageVersion: ImageType.BACKDROP, imageTag: itemData.BackdropImageTags[0], backdropItemId: itemData.id }
+    else if isValidAndNotEmpty(itemData.ParentBackdropImageTags) and isValid(itemData.ParentBackdropItemId)
+        return { imageVersion: ImageType.BACKDROP, imageTag: itemData.ParentBackdropImageTags[0], backdropItemId: itemData.ParentBackdropItemId }
+    else if isChainValid(itemData, "ImageTags.Primary")
+        return { imageVersion: ImageType.PRIMARY, imageTag: itemData.ImageTags.Primary, backdropItemId: itemData.id }
+    end if
+
+    return { imageVersion: ImageType.BACKDROP, imageTag: invalid, backdropItemId: itemData.id }
+end function
+
+' The modern backdrop stays sharp so the scrims handle readability
+function backdropRequestParams(params as object) as object
+    return params
+end function
+
+' Facts run left to right with a dot between each one, spaced the way the other
+' clients space them: a gap, then the dot with room either side. Every piece
+' centres on the tallest one in the row.
+sub layoutMetadataRow()
+    m.metaSeparators.removeChildrenIndex(m.metaSeparators.getChildCount(), 0)
+
+    for each id in ["releaseYear", "officialRating", "seasonCount", "episodeNumber", "endsAt", "metaGenres"]
+        node = m.top.findNode(id)
+        if isValid(node) then node.visible = (node.text <> "")
+    end for
+
+    runtimeNode = m.top.findNode("runtime")
+    m.runtimeGroup.visible = isValid(runtimeNode) and runtimeNode.text <> ""
+
+    orderSetting = invalid
+    hiddenSetting = invalid
+    if isValid(m.global) and isValid(m.global.session) and isValid(m.global.session.user) and isValid(m.global.session.user.settings)
+        orderSetting = m.global.session.user.settings[DETAIL_METADATA_ORDER_SETTING]
+        hiddenSetting = m.global.session.user.settings[DETAIL_METADATA_HIDDEN_SETTING]
+    end if
+
+    hiddenLookup = detailMetadataLayout.HiddenLookup(hiddenSetting)
+
+    ' Hide any items whose setting is explicitly hidden
+    if isValid(hiddenLookup["year"])
+        node = m.top.findNode("releaseYear")
+        if isValid(node) then node.visible = false
+    end if
+    if isValid(hiddenLookup["parentalRating"])
+        node = m.top.findNode("officialRating")
+        if isValid(node) then node.visible = false
+    end if
+    if isValid(hiddenLookup["runtimeAndSeasons"])
+        for each id in ["seasonCount", "episodeNumber", "runtimeGroup", "endsAt"]
+            node = m.top.findNode(id)
+            if isValid(node) then node.visible = false
+        end for
+    end if
+    if isValid(hiddenLookup["status"])
+        if isValid(m.statusBadge) then m.statusBadge.visible = false
+    end if
+    if isValid(hiddenLookup["upcomingEpisodeDate"])
+        if isValid(m.upcomingBadge) then m.upcomingBadge.visible = false
+    end if
+    if isValid(hiddenLookup["genres"])
+        node = m.top.findNode("metaGenres")
+        if isValid(node) then node.visible = false
+    end if
+
+    arranged = detailMetadataLayout.Arrange(detailMetadataLayout.DetailMetadata(), orderSetting, hiddenSetting)
+
+    orderedNodeIds = []
+    for each item in arranged
+        if item.id = "year"
+            orderedNodeIds.push("releaseYear")
+        else if item.id = "parentalRating"
+            orderedNodeIds.push("officialRating")
+        else if item.id = "runtimeAndSeasons"
+            orderedNodeIds.push("seasonCount")
+            orderedNodeIds.push("episodeNumber")
+            orderedNodeIds.push("runtimeGroup")
+            orderedNodeIds.push("endsAt")
+        else if item.id = "status"
+            orderedNodeIds.push("statusBadge")
+        else if item.id = "upcomingEpisodeDate"
+            orderedNodeIds.push("upcomingBadge")
+        else if item.id = "genres"
+            orderedNodeIds.push("metaGenres")
+        end if
+    end for
+
+    pieces = []
+    widths = []
+    heights = []
+    rowHeight = 0
+
+    for each id in orderedNodeIds
+        node = m.top.findNode(id)
+        if not isValid(node) or not node.visible then continue for
+        size = metaPieceSize(id, node)
+        pieces.push(node)
+        widths.push(size.width)
+        heights.push(size.height)
+        if size.height > rowHeight then rowHeight = size.height
+    end for
+
+    m.metaRowHeight = rowHeight
+
+    separator = fontApply.ThemeSeparator()
+    xPos = 0
+    for i = 0 to pieces.count() - 1
+        if i > 0
+            xPos += META_GAP + META_DOT_MARGIN
+            xPos += addMetaSeparator(separator, xPos, rowHeight) + META_DOT_MARGIN
+        end if
+        pieces[i].translation = [xPos, (rowHeight - heights[i]) / 2]
+        xPos += widths[i]
+    end for
+end sub
+
+' The badge and the runtime pair hold their own children, so those are placed
+' here and measured from the parts rather than from the group's bounds.
+function metaPieceSize(id as string, node as object) as object
+    if id = "statusBadge"
+        bg = m.top.findNode("statusBadgeBg")
+        return { width: bg.width, height: bg.height }
+    end if
+
+    if id = "upcomingBadge"
+        bg = m.top.findNode("upcomingBadgeBg")
+        return { width: bg.width, height: bg.height }
+    end if
+
+    if id = "runtimeGroup"
+        icon = m.top.findNode("runtimeIcon")
+        text = m.top.findNode("runtime")
+        bounds = text.boundingRect()
+        icon.translation = [0, (bounds.height - icon.height) / 2]
+        text.translation = [icon.width + META_ICON_GAP, 0]
+        return { width: icon.width + META_ICON_GAP + bounds.width, height: bounds.height }
+    end if
+
+    bounds = node.boundingRect()
+    return { width: bounds.width, height: bounds.height }
+end function
+
+' Returns the dot's width so the caller can carry on along the row
+function addMetaSeparator(text as string, xPos as float, rowHeight as float) as float
+    dot = CreateObject("roSGNode", "Label")
+    dot.font = m.top.findNode("releaseYear").font
+    dot.color = META_INK
+    dot.text = text
+    m.metaSeparators.appendChild(dot)
+
+    bounds = dot.boundingRect()
+    dot.translation = [xPos, (rowHeight - bounds.height) / 2]
+    return bounds.width
+end function

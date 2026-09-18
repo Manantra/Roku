@@ -6291,7 +6291,7 @@
         "children": [
           {
             "title": "Detail Screen Style",
-            "description": "Choose between the classic detail layout and a modern cinematic layout with tabs.",
+            "description": "Choose the detail layout: modern with tabs, Spotlight with artwork-first summary cards, or classic.",
             "settingName": "ui.itemdetail.style",
             "icon": "movie.png",
             "type": "radio",
@@ -6300,6 +6300,10 @@
               {
                 "title": "Modern",
                 "id": "modern"
+              },
+              {
+                "title": "Spotlight",
+                "id": "spotlight"
               },
               {
                 "title": "Classic",

@@ -450,4 +450,15 @@ sub MigrateSettings()
         drawable = settingsSync.NavbarPosition(storedNav)
         if not isStringEqual(storedNav, drawable) then set_user_setting("navbar.position", drawable)
     end if
+
+    ' Same case for the detail style: the server profile is shared with clients that
+    ' name the styles v1-v4, so a synced token is one this client has no screen for.
+    ' Repaired at launch so the picker shows a real option instead of the raw token.
+    storedStyle = get_user_setting("ui.itemdetail.style")
+    if isValid(storedStyle)
+        drawableStyle = normalizeDetailScreenStyleToken(storedStyle)
+        if not isStringEqual(storedStyle.toStr(), drawableStyle)
+            set_user_setting("ui.itemdetail.style", drawableStyle)
+        end if
+    end if
 end sub

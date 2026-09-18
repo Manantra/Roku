@@ -51,6 +51,9 @@
     <field id="hasContent" type="boolean" value="false" />
     <!-- How far down the block the focused section sits, so a host can scroll it into view -->
     <field id="focusedOffset" type="integer" value="0" alwaysNotify="true" />
+    <!-- What Seerr returned, so a host can draw the same titles its own way -->
+    <field id="recommendationItems" type="array" alwaysNotify="true" />
+    <field id="similarItems" type="array" alwaysNotify="true" />
     <function name="loadTarget" />
     <function name="focusFirst" />
   </interface>

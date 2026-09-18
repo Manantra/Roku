@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SpotlightSummaryCard" extends="Group">
+  <children>
+    <!-- Landscape artwork under a scrim, an icon badge naming the card, its
+        title and counts, and an arrow saying it opens something -->
+    <Rectangle id="cardFrame" width="260" height="180" color="#000000">
+      <Poster id="cardImage"
+        width="260"
+        height="180"
+        loadDisplayMode="scaleToFill" />
+      <Rectangle id="cardImageEmpty"
+        width="260" height="180" color="#1A1C20" visible="false" />
+      <Rectangle id="cardScrim" width="260" height="180" color="#000000" opacity="0.45" />
+      <Poster id="cardBadgeBg"
+        uri="pkg:/images/icons/circle.png"
+        width="36" height="36"
+        blendColor="#000000" opacity="0.45"
+        translation="[10, 10]" />
+      <Poster id="cardBadgeIcon"
+        width="22" height="22"
+        translation="[17, 17]"
+        blendColor="#FFFFFF" />
+      <Poster id="cardArrow"
+        uri="pkg:/images/icons/detail_play.png"
+        width="22" height="22"
+        translation="[226, 146]"
+        blendColor="#FFFFFF" opacity="0.55" />
+      <Label id="cardTitle"
+        translation="[14, 108]"
+        width="206"
+        height="52"
+        font="font:SmallBoldSystemFont"
+        color="#FFFFFF"
+        maxLines="2"
+        wrap="true" />
+      <Label id="cardSubtitle"
+        translation="[14, 152]"
+        width="206"
+        height="24"
+        font="font:SmallestSystemFont"
+        color="#FFFFFFBF"
+        ellipsizeOnBoundary="true" />
+    </Rectangle>
+    <!-- Focus border drawn over the card, the way the grids draw theirs -->
+    <Poster id="cardFocus"
+      uri="pkg:/images/hd_focus.9.png"
+      width="260" height="180"
+      loadDisplayMode="scaleToFit"
+      visible="false" />
+  </children>
+  <interface>
+    <field id="cardData" type="assocarray" onChange="onCardDataChanged" />
+    <field id="cardSize" type="array" onChange="setCardSize" />
+    <field id="focused" type="boolean" onChange="onFocusChanged2" />
+  </interface>
+</component>
