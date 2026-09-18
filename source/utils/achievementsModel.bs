@@ -17,6 +17,11 @@ const POWER_UP_USED = "used"
 const POWER_UP_REFUSED = "refused"
 const POWER_UP_FAILED = "failed"
 
+' How buying from the shop ended. A refusal is the plugin saying no, not a fault.
+const PURCHASE_BOUGHT = "bought"
+const PURCHASE_REFUSED = "refused"
+const PURCHASE_FAILED = "failed"
+
 namespace achievementsModel
 
     function IsObject(value as dynamic) as boolean
@@ -289,6 +294,24 @@ namespace achievementsModel
             bank: AsInt(Field(json, "ScoreBank")),
             slots: ParsePowerUpSlots(Field(json, "Inventory"))
         }
+    end function
+
+    ' One thing the shop sells. The name and description the catalogue carries are English only,
+    ' so only the type, the pack size and the price are read.
+    function ParseShopPowerUp(json as object) as object
+        return {
+            id: AsString(Field(json, "Id")),
+            ' Matches a slot's type, which is how a row finds its own wording
+            type: AsString(Field(json, "Type")),
+            bundleSize: AsInt(Field(json, "BundleSize")),
+            priceScore: AsInt(Field(json, "PriceScore"))
+        }
+    end function
+
+    ' The catalogue also carries cosmetics, which this panel has no way to draw, so only the
+    ' power-ups are read.
+    function ParseShopCatalog(json as object) as object
+        return MapList(Field(json, "PowerUps"), achievementsModel.ParseShopPowerUp)
     end function
 
     ' The replacement set comes back with the answer, so a reroll needs no second fetch

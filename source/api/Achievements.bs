@@ -8,7 +8,7 @@ import "pkg:/source/utils/misc.bs"
 ' Nothing here throws. A server without the plugin answers 404 on every route, and a panel that
 ' asked for everything at once and got nothing back wants an empty screen rather than a pile of
 ' errors, so a failed call reads as no answer. Nothing here polls, and the login ping, the quest
-' reroll and spending a power-up are the only writes.
+' reroll, spending a power-up and buying one are the only writes.
 
 const ACHIEVEMENTS_ROOT = "/Plugins/AchievementBadges"
 ' What the panel opens on, so the screen that can change it knows what it was handed
@@ -65,7 +65,7 @@ namespace achievements
     ' Writes to a path and tells a refusal apart from a fault. refusedWith is the status the
     ' plugin answers when it means no, so that one comes back with whatever the plugin said, and
     ' anything else reads as a plain failure.
-    function Post(path as string, refusedWith = 0 as integer) as object
+    function Post(path as string, refusedWith = 0 as integer, sent = invalid as object) as object
         req = APIRequest(`${ACHIEVEMENTS_ROOT}/${path}`)
         if not isValid(req) then return {}
 
@@ -73,7 +73,7 @@ namespace achievements
         req.SetRequest("POST")
         req.setMessagePort(CreateObject("roMessagePort"))
         req.AddHeader("Content-Type", "application/json")
-        req.AsyncPostFromString("")
+        req.AsyncPostFromString(isValid(sent) ? FormatJson(sent) : "")
 
         event = wait(30000, req.GetMessagePort())
         if type(event) <> "roUrlEvent"
@@ -143,6 +143,35 @@ namespace achievements
             outcome: POWER_UP_USED,
             slots: achievementsModel.ParsePowerUpSlots(achievementsModel.Field(written.body, "Inventory"))
         }
+    end function
+
+    ' What the shop sells, narrowed to the power-ups. The catalogue is the same for everyone, so
+    ' this route carries no user.
+    function FetchShopPowerUps() as object
+        json = GetMap("shop/catalog")
+        if not isValid(json) then return []
+
+        return achievementsModel.ParseShopCatalog(json)
+    end function
+
+    ' Buys one thing from the shop. The plugin refuses with 400 when the bank is short or the slot
+    ' is already full, and its wording says which.
+    function BuyShopItem(itemId as string) as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) or not isValidAndNotEmpty(itemId) then return { outcome: PURCHASE_FAILED }
+
+        written = Post(`users/${userId}/shop/purchase`, 400, { ItemId: itemId })
+
+        if written.refused = true then return { outcome: PURCHASE_REFUSED, message: written.message }
+        if not achievementsModel.IsObject(written.body) then return { outcome: PURCHASE_FAILED }
+
+        ' The answer says what the bank holds now, so nothing has to be read again. A plugin too
+        ' old to report it leaves the figure at -1, since invalid does not survive the task result.
+        bought = { outcome: PURCHASE_BOUGHT, bankAfter: -1 }
+        after = achievementsModel.Field(written.body, "ScoreBalanceAfter")
+        if isValid(after) then bought.bankAfter = achievementsModel.AsInt(after)
+
+        return bought
     end function
 
     function FetchLeaderboard(category = "" as string, limit = 10 as integer) as object

@@ -67,6 +67,10 @@
         <translation>Cancel</translation>
     </message>
     <message>
+        <source>Buy this?</source>
+        <translation>Buy this?</translation>
+    </message>
+    <message>
         <source>Checking Direct Play capability...</source>
         <extracomment>Shown in the Nouveau details footer while the server is asked how it would play the file</extracomment>
         <translation>Checking Direct Play capability...</translation>
@@ -102,6 +106,10 @@
     <message>
         <source>Connect to Server</source>
         <translation>Connect to Server</translation>
+    </message>
+    <message>
+        <source>Could not buy that.</source>
+        <translation>Could not buy that.</translation>
     </message>
     <message>
         <source>Could not load your achievements.</source>
@@ -220,6 +228,10 @@
         <translation>Instant Mix</translation>
     </message>
     <message>
+        <source>It comes straight out of your score bank.</source>
+        <translation>It comes straight out of your score bank.</translation>
+    </message>
+    <message>
         <source>Larger cards with titles underneath.</source>
         <translation>Larger cards with titles underneath.</translation>
     </message>
@@ -290,6 +302,10 @@
     <message>
         <source>No messages from your server yet</source>
         <translation>No messages from your server yet</translation>
+    </message>
+    <message>
+        <source>Nothing for sale right now.</source>
+        <translation>Nothing for sale right now.</translation>
     </message>
     <message>
         <source>Nothing here yet.</source>
@@ -585,6 +601,14 @@
     <message>
         <source>Settings</source>
         <translation>Settings</translation>
+    </message>
+    <message>
+        <source>Shop</source>
+        <translation>Shop</translation>
+    </message>
+    <message>
+        <source>Spend score on more boosts</source>
+        <translation>Spend score on more boosts</translation>
     </message>
     <message>
         <source>Change User</source>
@@ -2947,6 +2971,11 @@
         <source>{0} pts</source>
         <extracomment>What a badge is worth</extracomment>
         <translation>{0} pts</translation>
+    </message>
+    <message>
+        <source>{0} ×{1}</source>
+        <extracomment>A pack of power-ups in the shop, such as XP Boost x3</extracomment>
+        <translation>{0} ×{1}</translation>
     </message>
     <message>
         <source>{0} held</source>

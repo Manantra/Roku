@@ -99,9 +99,12 @@ sub init()
     m.badgeId = ""
     m.chase = invalid
     m.powerUps = invalid
-    m.powerUpProblem = ""
-    m.powerUpBusy = false
+    m.shopItems = []
+    m.shopBank = 0
+    m.spendProblem = ""
+    m.spendBusy = false
     m.powerUpType = ""
+    m.shopItemId = ""
     m.rerollBusy = false
     m.rerollFailed = false
     m.rerollWeekly = false
@@ -118,9 +121,9 @@ sub OnScreenShown(_isReturning = false as boolean)
 end sub
 
 sub startLoad(request as object)
-    ' A reroll or a spend answers one row, so the list stays on screen rather than blanking to
-    ' a spinner
-    m.loading = request.kind <> "reroll" and request.kind <> "usePowerUp"
+    ' A reroll, a spend or a purchase answers one row, so the list stays on screen rather than
+    ' blanking to a spinner
+    m.loading = request.kind <> "reroll" and request.kind <> "usePowerUp" and request.kind <> "buy"
     render()
     m.loadTask.control = TaskControl.STOP
     m.loadTask.request = request
@@ -138,8 +141,13 @@ sub onLoadResult(event as object)
         m.chase = result.chase
     else if result.kind = "powerups"
         m.powerUps = result.powerUps
+    else if result.kind = "shop"
+        m.shopItems = result.items
+        m.shopBank = isValid(result.powerUps) ? result.powerUps.bank : 0
     else if result.kind = "usePowerUp"
         applySpend(result.spend)
+    else if result.kind = "buy"
+        applyPurchase(result.purchase)
     else if result.kind = "leaderboard"
         m.boardEntries = result.entries
     else if result.kind = "recap"
@@ -153,7 +161,7 @@ sub onLoadResult(event as object)
     end if
 
     render()
-    if result.kind = "reroll" or result.kind = "usePowerUp" then focusRow(m.spendIndex)
+    if result.kind = "reroll" or result.kind = "usePowerUp" or result.kind = "buy" then focusRow(m.spendIndex)
 end sub
 
 ' ===== Views =====
@@ -169,6 +177,13 @@ function popView() as boolean
 
     held = m.stack.pop()
     m.view = held.view
+
+    ' The shop spends from the bank the loadout shows, so coming back reads it again
+    if m.view = "loadout"
+        startLoad({ kind: "powerups" })
+        return true
+    end if
+
     render()
     focusRow(held.index)
     return true
@@ -211,6 +226,8 @@ sub render()
             return
         end if
         m.rows = loadoutRows()
+    else if m.view = "shop"
+        m.rows = shopRows()
     else if m.view = "quests"
         m.rows = questRows()
     else if m.view = "leaderboard"
@@ -245,6 +262,7 @@ function breadcrumb() as string
     if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
     if m.view = "loadout" then return `${title} / ${tr("Loadout")}`
+    if m.view = "shop" then return `${title} / ${tr("Loadout")} / ${tr("Shop")}`
     if m.view = "library" then return `${title} / ${tr("Library completion")}`
     return title
 end function
@@ -721,21 +739,30 @@ function heldLabel(count as integer) as string
     return substitute(tr("{0} held"), count.toStr())
 end function
 
+' The score a viewer still has to spend, above whatever it can be spent on. Every row in the
+' list takes the same height, so the figure rides with its heading rather than sitting a whole
+' row below it.
+function scoreBankRow(bank as integer) as object
+    row = headingRow(tr("Score bank"))
+    row.caption = substitute(tr("{0} points"), bank.toStr())
+
+    return row
+end function
+
 function loadoutRows() as object
     rows = []
     if not isValid(m.powerUps) then return rows
 
-    rows.push(headingRow(tr("Score bank")))
-    rows.push(headingRow(substitute(tr("{0} points"), m.powerUps.bank.toStr())))
+    rows.push(scoreBankRow(m.powerUps.bank))
 
     rows.push(headingRow(tr("Power-ups")))
     for each slot in m.powerUps.slots
         rows.push(powerUpRow(slot))
     end for
 
-    ' A heading is not a focus stop and the list only scrolls as far as focus goes, so what the
-    ' plugin said is a row of its own to keep it reachable
-    if m.powerUpProblem <> "" then rows.push({ kind: "note", title: m.powerUpProblem, height: 120 })
+    rows.push(navRow("shop", tr("Shop"), tr("Spend score on more boosts"), "storefront", true))
+
+    if m.spendProblem <> "" then rows.push(noteRow(m.spendProblem))
 
     return rows
 end function
@@ -749,7 +776,7 @@ function powerUpRow(slot as object) as object
     row = {
         kind: "powerup",
         powerUpType: slot.type,
-        offered: slot.count > 0 and not m.powerUpBusy,
+        offered: slot.count > 0 and not m.spendBusy,
         title: text.name,
         caption: text.body,
         icon: slot.icon,
@@ -763,9 +790,56 @@ function powerUpRow(slot as object) as object
     return row
 end function
 
+function shopRows() as object
+    rows = [scoreBankRow(m.shopBank)]
+
+    if m.shopItems.count() = 0
+        rows.push(noteRow(tr("Nothing for sale right now.")))
+        return rows
+    end if
+
+    for each item in m.shopItems
+        rows.push(shopRow(item))
+    end for
+
+    if m.spendProblem <> "" then rows.push(noteRow(m.spendProblem))
+
+    return rows
+end function
+
+function shopRow(item as object) as object
+    text = powerUpText(item.type)
+    affordable = item.priceScore <= m.shopBank and not m.spendBusy
+
+    title = text.name
+    if item.bundleSize > 1 then title = substitute(tr("{0} ×{1}"), text.name, item.bundleSize.toStr())
+
+    return {
+        kind: "shop",
+        itemId: item.id,
+        offered: affordable,
+        title: title,
+        caption: text.body,
+        icon: "storefront",
+        tint: m.accent,
+        trailingTop: substitute(tr("{0} points"), item.priceScore.toStr()),
+        trailingColor: affordable ? m.accent : "#FFFFFFB3",
+        height: 150
+    }
+end function
+
+sub openShop()
+    m.shopItems = []
+    m.shopBank = 0
+    m.spendProblem = ""
+    m.loading = true
+    pushView("shop")
+    startLoad({ kind: "shop" })
+end sub
+
 sub openLoadout()
     m.powerUps = invalid
-    m.powerUpProblem = ""
+    m.spendProblem = ""
     ' The screen opens on its loading line rather than flashing an empty loadout
     m.loading = true
     pushView("loadout")
@@ -836,6 +910,12 @@ function rerollRow(weekly as boolean, rerollsLeft as integer) as object
         tint: m.accent,
         height: 120
     }
+end function
+
+' A heading is not a focus stop and the list only scrolls as far as focus goes, so anything the
+' viewer has to read at the end of a list is a row of its own to keep it reachable
+function noteRow(text as string) as object
+    return { kind: "note", title: text, height: 120 }
 end function
 
 function headingRow(title as string) as object
@@ -1013,28 +1093,57 @@ sub askUsePowerUp(powerUpType as string)
     askSpend(tr("Use this power-up?"), tr("It's spent as soon as you confirm."), "onUsePowerUpChosen")
 end sub
 
-sub onUsePowerUpChosen(event as object)
+' Both spending screens answer a confirm the same way, so only what it starts differs
+function spendConfirmed(event as object) as boolean
     chosen = event.getData()
     closeSpendPrompt()
-    if chosen <> 1 then return
+    if chosen <> 1 then return false
 
-    m.powerUpBusy = true
-    m.powerUpProblem = ""
+    m.spendBusy = true
+    m.spendProblem = ""
     render()
     focusRow(m.spendIndex)
+    return true
+end function
+
+sub onUsePowerUpChosen(event as object)
+    if not spendConfirmed(event) then return
+
     startLoad({ kind: "usePowerUp", powerUpType: m.powerUpType })
+end sub
+
+sub askBuy(itemId as string)
+    m.shopItemId = itemId
+    askSpend(tr("Buy this?"), tr("It comes straight out of your score bank."), "onBuyChosen")
+end sub
+
+sub onBuyChosen(event as object)
+    if not spendConfirmed(event) then return
+
+    startLoad({ kind: "buy", itemId: m.shopItemId })
+end sub
+
+sub applyPurchase(result as object)
+    m.spendBusy = false
+    if result.outcome = PURCHASE_BOUGHT
+        if result.bankAfter >= 0 then m.shopBank = result.bankAfter
+        return
+    end if
+
+    m.spendProblem = tr("Could not buy that.")
+    if result.outcome = PURCHASE_REFUSED and isValidAndNotEmpty(result.message) then m.spendProblem = result.message
 end sub
 
 ' Spending one costs no score, so only the inventory moves
 sub applySpend(result as object)
-    m.powerUpBusy = false
+    m.spendBusy = false
     if result.outcome = POWER_UP_USED
         if isValid(m.powerUps) then m.powerUps.slots = result.slots
         return
     end if
 
-    m.powerUpProblem = tr("Could not use that power-up.")
-    if result.outcome = POWER_UP_REFUSED and isValidAndNotEmpty(result.message) then m.powerUpProblem = result.message
+    m.spendProblem = tr("Could not use that power-up.")
+    if result.outcome = POWER_UP_REFUSED and isValidAndNotEmpty(result.message) then m.spendProblem = result.message
 end sub
 
 ' The server is the authority on what is left, so its answer settles the row whether it handed
@@ -1157,6 +1266,8 @@ sub onRowSelected()
     if row.kind = "nav"
         if row.view = "loadout"
             openLoadout()
+        else if row.view = "shop"
+            openShop()
         else if isValidAndNotEmpty(row.view)
             pushView(row.view)
         end if
@@ -1175,6 +1286,11 @@ sub onRowSelected()
 
     if row.kind = "powerup"
         if row.offered then askUsePowerUp(row.powerUpType)
+        return
+    end if
+
+    if row.kind = "shop"
+        if row.offered then askBuy(row.itemId)
         return
     end if
 
