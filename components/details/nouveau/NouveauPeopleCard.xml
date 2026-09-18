@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauPeopleCard" extends="Group">
+    <children>
+        <!-- A face in the cast and crew rail. The avatar is a circle inside the
+            card's width rather than the whole of it, so the names underneath have
+            room to sit without the faces touching -->
+        <Group id="avatarGroup">
+            <Poster id="avatarRing" uri="pkg:/images/icons/circle.png" blendColor="#FFFFFF1A" />
+            <MaskGroup id="avatarMask" maskUri="pkg:/images/icons/circle.png">
+                <Rectangle id="avatarBg" color="#FFFFFF" opacity="0.06" />
+                <Poster id="avatarImage" loadDisplayMode="scaleToZoom"
+                    failedBitmapUri="pkg:/images/baseline_person_white_48dp.png" />
+            </MaskGroup>
+        </Group>
+        <Label id="personName" font="font:SmallSystemFont" color="#FFFFFF"
+            horizAlign="center" wrap="true" maxLines="2" />
+        <Label id="personRole" font="font:SmallSystemFont" color="#FFFFFF99"
+            horizAlign="center" wrap="true" maxLines="2" />
+    </children>
+    <interface>
+        <field id="cardData" type="assocarray" onChange="onCardDataChanged" />
+        <!-- [card width, avatar size] -->
+        <field id="cardSize" type="array" onChange="onCardSizeChanged" />
+        <field id="focused" type="boolean" onChange="onFocusChanged" />
+        <field id="cardHeight" type="float" value="0" />
+    </interface>
+</component>

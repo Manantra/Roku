@@ -1,4 +1,5 @@
 import "pkg:/source/api/Image.bs"
+import "pkg:/source/utils/detailImages.bs"
 import "pkg:/source/utils/misc.bs"
 
 ' Which summary cards an item gets, in what order, and what each one opens.
@@ -66,41 +67,14 @@ function spotlightDedupePeople(people as object) as object
     return out
 end function
 
-' Which artwork a summary card leads with. Library items ask the server, Seerr
-' items carry their TMDB url already. The extras loader fills posterURL on most
-' nodes it hands over, so that is the first thing read.
-function spotlightItemImageUrl(serverUrl as string, item as object) as string
-    if not isValid(item) then return ""
-
-    if isValidAndNotEmpty(chainLookupReturn(item, "_externalPosterUrl", "")) then return item._externalPosterUrl
-    if isValidAndNotEmpty(item.posterURL) then return item.posterURL
-
-    if isValidAndNotEmpty(item.id) then return ImageURL(item.id, "Primary", { "maxHeight": 360, "quality": 90 })
-    return ""
+' Which artwork a summary card leads with, and the landscape thumbnail a wider
+' card takes, both shared with the Nouveau screen
+function spotlightItemImageUrl(_serverUrl as string, item as object) as string
+    return detailImages.ItemImageUrl(item)
 end function
 
-' A landscape thumbnail, taking 16:9 art over a poster. Thumb first, then the
-' item's own backdrop, then the one it inherits from its parent.
-function spotlightLandscapeImageUrl(serverUrl as string, item as object) as string
-    if not isValid(item) then return ""
-
-    if isValidAndNotEmpty(chainLookupReturn(item, "_externalBackdropUrl", "")) then return item._externalBackdropUrl
-
-    thumb = chainLookupReturn(item, "json.ImageTags.Thumb", "")
-    if isValidAndNotEmpty(thumb) then return ImageURL(item.id, "Thumb", { "maxWidth": 640, "quality": 90, "tag": thumb })
-
-    backdropTags = chainLookupReturn(item, "json.BackdropImageTags", invalid)
-    if isValid(backdropTags) and backdropTags.count() > 0
-        return ImageURL(item.id, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": backdropTags[0] })
-    end if
-
-    parentBackdropId = chainLookupReturn(item, "json.ParentBackdropItemId", "")
-    parentBackdropTags = chainLookupReturn(item, "json.ParentBackdropImageTags", invalid)
-    if isValidAndNotEmpty(parentBackdropId) and isValid(parentBackdropTags) and parentBackdropTags.count() > 0
-        return ImageURL(parentBackdropId, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": parentBackdropTags[0] })
-    end if
-
-    return spotlightItemImageUrl(serverUrl, item)
+function spotlightLandscapeImageUrl(_serverUrl as string, item as object) as string
+    return detailImages.LandscapeImageUrl(item)
 end function
 
 function spotlightFirstPosterUrl(serverUrl as string, items as object) as string

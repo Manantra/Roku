@@ -1,0 +1,114 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+const NOUVEAU_BLOCK_GAP = 10
+const NOUVEAU_DETAILS_PAD_X = 16
+const NOUVEAU_DETAILS_PAD_TOP = 14
+const NOUVEAU_DETAILS_PAD_BOTTOM = 16
+const NOUVEAU_DETAILS_TITLE_HEIGHT = 21
+const NOUVEAU_DETAILS_OVERVIEW_GAP = 7
+const NOUVEAU_DETAILS_OVERVIEW_HEIGHT = 48
+
+sub init()
+    m.artMask = m.top.findNode("artMask")
+    m.artBg = m.top.findNode("artBg")
+    m.artImage = m.top.findNode("artImage")
+    m.placeholderLabel = m.top.findNode("placeholderLabel")
+    m.progressTrack = m.top.findNode("progressTrack")
+    m.progressFill = m.top.findNode("progressFill")
+    m.nextUpBadge = m.top.findNode("nextUpBadge")
+    m.nextUpFill = m.top.findNode("nextUpFill")
+    m.nextUpText = m.top.findNode("nextUpText")
+    m.artBorder = m.top.findNode("artBorder")
+    m.artFocus = m.top.findNode("artFocus")
+
+    m.details = m.top.findNode("details")
+    m.detailsFill = m.top.findNode("detailsFill")
+    m.detailsBorder = m.top.findNode("detailsBorder")
+    m.detailsFocus = m.top.findNode("detailsFocus")
+    m.detailsTitle = m.top.findNode("detailsTitle")
+    m.detailsOverview = m.top.findNode("detailsOverview")
+
+    m.detailsTitle.font.size = 18
+    m.detailsOverview.font.size = 15
+    m.placeholderLabel.font.size = 15
+    m.nextUpText.font.size = 13
+    m.nextUpText.text = tr("Up Next")
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onCardSizeChanged()
+    size = m.top.cardSize
+    if not isValidAndNotEmpty(size) or size.count() < 2 then return
+
+    width = size[0]
+    artHeight = size[1]
+
+    m.artMask.maskSize = [width, artHeight]
+    m.artBg.width = width
+    m.artBg.height = artHeight
+    m.artImage.width = width
+    m.artImage.height = artHeight
+    m.placeholderLabel.width = width
+    m.placeholderLabel.height = artHeight
+    m.progressTrack.width = width
+    m.progressTrack.translation = [0, artHeight - 4]
+    m.artBorder.width = width
+    m.artBorder.height = artHeight
+    m.artFocus.width = width
+    m.artFocus.height = artHeight
+
+    m.nextUpFill.width = m.nextUpText.boundingRect().width + 20
+    m.nextUpText.width = m.nextUpFill.width
+
+    textWidth = width - NOUVEAU_DETAILS_PAD_X * 2
+    m.detailsTitle.translation = [NOUVEAU_DETAILS_PAD_X, NOUVEAU_DETAILS_PAD_TOP]
+    m.detailsTitle.width = textWidth
+    m.detailsTitle.height = NOUVEAU_DETAILS_TITLE_HEIGHT
+    m.detailsOverview.translation = [NOUVEAU_DETAILS_PAD_X, NOUVEAU_DETAILS_PAD_TOP + NOUVEAU_DETAILS_TITLE_HEIGHT + NOUVEAU_DETAILS_OVERVIEW_GAP]
+    m.detailsOverview.width = textWidth
+    m.detailsOverview.height = NOUVEAU_DETAILS_OVERVIEW_HEIGHT
+
+    detailsHeight = NOUVEAU_DETAILS_PAD_TOP + NOUVEAU_DETAILS_TITLE_HEIGHT + NOUVEAU_DETAILS_OVERVIEW_GAP + NOUVEAU_DETAILS_OVERVIEW_HEIGHT + NOUVEAU_DETAILS_PAD_BOTTOM
+
+    m.details.translation = [0, artHeight + NOUVEAU_BLOCK_GAP]
+    m.detailsFill.width = width
+    m.detailsFill.height = detailsHeight
+    m.detailsBorder.width = width
+    m.detailsBorder.height = detailsHeight
+    m.detailsFocus.width = width
+    m.detailsFocus.height = detailsHeight
+
+    m.top.cardHeight = artHeight + NOUVEAU_BLOCK_GAP + detailsHeight
+end sub
+
+sub onCardDataChanged()
+    data = m.top.cardData
+    if not isValid(data) then return
+
+    hasImage = isValidAndNotEmpty(data.imageUrl)
+    m.artImage.uri = hasImage ? data.imageUrl : ""
+    m.placeholderLabel.text = isValid(data.title) ? UCase(data.title) : ""
+    m.placeholderLabel.visible = not hasImage
+
+    m.detailsTitle.text = isValid(data.title) ? data.title : ""
+    m.detailsOverview.text = isValid(data.overview) ? data.overview : ""
+    m.detailsOverview.visible = isValidAndNotEmpty(m.detailsOverview.text)
+
+    m.nextUpBadge.visible = isValid(data.isNextUp) and data.isNextUp = true
+
+    progress = isValid(data.progress) ? data.progress : 0
+    show = progress > 0 and progress < 1
+    m.progressTrack.visible = show
+    if show then m.progressFill.width = m.progressTrack.width * progress
+
+    onCardSizeChanged()
+end sub
+
+sub onFocusPartChanged()
+    part = m.top.focusPart
+    m.artFocus.visible = part = 0
+    m.detailsFocus.visible = part = 1
+    m.detailsFill.opacity = part = 1 ? 0.96 : 0.88
+end sub

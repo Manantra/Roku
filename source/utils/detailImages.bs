@@ -1,0 +1,57 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Which artwork a detail screen's card leads with. Library items ask the server,
+' Seerr items carry their TMDB url already, and the extras loader fills posterURL
+' on most nodes it hands over, so that is the first thing read.
+
+namespace detailImages
+
+    function ItemImageUrl(item as object) as string
+        if not isValid(item) then return ""
+
+        if isValidAndNotEmpty(chainLookupReturn(item, "_externalPosterUrl", "")) then return item._externalPosterUrl
+        if isValidAndNotEmpty(item.posterURL) then return item.posterURL
+
+        if isValidAndNotEmpty(item.id) then return ImageURL(item.id, "Primary", { "maxHeight": 360, "quality": 90 })
+        return ""
+    end function
+
+    ' A landscape thumbnail, taking 16:9 art over a poster. Thumb first, then the
+    ' item's own backdrop, then the one it inherits from its parent.
+    function LandscapeImageUrl(item as object) as string
+        if not isValid(item) then return ""
+
+        if isValidAndNotEmpty(chainLookupReturn(item, "_externalBackdropUrl", "")) then return item._externalBackdropUrl
+
+        thumb = chainLookupReturn(item, "json.ImageTags.Thumb", "")
+        if isValidAndNotEmpty(thumb) then return ImageURL(item.id, "Thumb", { "maxWidth": 640, "quality": 90, "tag": thumb })
+
+        backdropTags = chainLookupReturn(item, "json.BackdropImageTags", invalid)
+        if isValid(backdropTags) and backdropTags.count() > 0
+            return ImageURL(item.id, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": backdropTags[0] })
+        end if
+
+        parentBackdropId = chainLookupReturn(item, "json.ParentBackdropItemId", "")
+        parentBackdropTags = chainLookupReturn(item, "json.ParentBackdropImageTags", invalid)
+        if isValidAndNotEmpty(parentBackdropId) and isValid(parentBackdropTags) and parentBackdropTags.count() > 0
+            return ImageURL(parentBackdropId, "Backdrop", { "maxWidth": 640, "quality": 90, "tag": parentBackdropTags[0] })
+        end if
+
+        return ItemImageUrl(item)
+    end function
+
+    ' An episode keeps its own still under Primary, so that is asked for first.
+    ' Falling straight to the wider search ends at the parent backdrop, which every
+    ' episode of a season shares, and the whole rail comes out looking the same.
+    function CardImageUrl(item as object, fallbackUrl = "" as string) as string
+        url = ItemImageUrl(item)
+        if isValidAndNotEmpty(url) then return url
+
+        url = LandscapeImageUrl(item)
+        if isValidAndNotEmpty(url) then return url
+
+        return fallbackUrl
+    end function
+
+end namespace

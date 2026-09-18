@@ -1,0 +1,424 @@
+import "pkg:/source/utils/misc.bs"
+
+' The Nouveau detail screen puts everything on one page: the hero at the top and
+' every section under it as its own rail rather than behind a tab. What each rail
+' is made of, how wide its cards are and which order the sections come in are all
+' plain functions of what the screen already knows, so they can be reasoned about
+' without drawing anything.
+
+' The page gutter, and the room a rail has between the two gutters
+const NOUVEAU_SECTION_INSET = 56
+const NOUVEAU_VIEWPORT = 1808
+
+' Chapters, extras and discovery keep the wider gap. The rails tuned for a remote
+' tighten to 32.
+const NOUVEAU_RAIL_GAP = 40
+const NOUVEAU_TV_RAIL_GAP = 32
+
+' A card's caption sits under its artwork, and the two lines in it are a fixed
+' height so the cards along a rail line up along the bottom
+const NOUVEAU_CAPTION_GAP = 10
+const NOUVEAU_TITLE_HEIGHT = 23
+const NOUVEAU_SUBTITLE_HEIGHT = 20
+
+' Whole cards plus the fraction of one more, rounded up, which is how many of the
+' library's own results are kept at the head of the discovery rail where a Seerr
+' title cant push them out
+const NOUVEAU_PROTECTED_COUNT = 7
+
+const NOUVEAU_SECTION_EPISODES = "episodes"
+const NOUVEAU_SECTION_CHAPTERS = "chapters"
+const NOUVEAU_SECTION_EXTRAS = "extras"
+const NOUVEAU_SECTION_DISCOVERY = "discovery"
+const NOUVEAU_SECTION_PEOPLE = "people"
+const NOUVEAU_SECTION_DETAILS = "details"
+
+namespace nouveauLayout
+
+    ' Whole cards plus the fraction of one more, which is what leaves the last card
+    ' peeking in from the edge to say the rail keeps going. Only the cards that fit
+    ' whole are charged a gap.
+    function FractionalRailWidth(available as float, visibleCount as float, gap as integer) as integer
+        width = (available - Int(visibleCount) * gap) / visibleCount
+        if width <= 0 then return 0
+        return Int(width)
+    end function
+
+    ' Every card fits whole, so there is one gap fewer than there are cards.
+    function CountRailWidth(available as float, visibleCards as integer, gap as integer) as integer
+        width = (available - (visibleCards - 1) * gap) / visibleCards
+        if width <= 0 then return 0
+        return Int(width)
+    end function
+
+    ' Every card size on the page, worked out from the room a rail has rather than
+    ' from a table. A row of faces divides by a whole count because a part of a face
+    ' reads as a mistake, everything else divides by a fractional one.
+    function Metrics() as object
+        room = NOUVEAU_VIEWPORT
+
+        episodeWidth = FractionalRailWidth(room, 3.25, NOUVEAU_TV_RAIL_GAP)
+        posterWidth = FractionalRailWidth(room, 6.15, NOUVEAU_RAIL_GAP)
+        mediaWidth = FractionalRailWidth(room, 4.15, NOUVEAU_RAIL_GAP)
+        personWidth = CountRailWidth(room, 8, NOUVEAU_TV_RAIL_GAP)
+
+        return {
+            episodeWidth: episodeWidth,
+            episodeImageHeight: Int(episodeWidth * 9 / 16),
+            posterWidth: posterWidth,
+            posterHeight: Int(posterWidth * 3 / 2),
+            mediaWidth: mediaWidth,
+            mediaArtworkHeight: Int(mediaWidth * 9 / 16),
+            personWidth: personWidth,
+            personAvatar: Int(personWidth * 0.84)
+        }
+    end function
+
+    ' ===== Sections =====
+
+    ' Only the two types that can carry a recommendation list of their own.
+    function SupportsDiscovery(itemType as string) as boolean
+        return itemType = "movie" or itemType = "series"
+    end function
+
+    ' Held open while a lookup is still out, so the rail keeps its place rather than
+    ' appearing late and pushing everything under it down the page. Once the answers
+    ' are in it is only kept for one that actually has something in it.
+    function IncludesDiscovery(state as object) as boolean
+        if not SupportsDiscovery(state.itemType) then return false
+        if state.similarLoaded <> true then return true
+        if state.similarCount > 0 then return true
+        if state.seerrExpected <> true then return false
+        if state.seerrResolved <> true then return true
+        return state.seerrSimilarCount > 0 or state.seerrRecommendationCount > 0
+    end function
+
+    ' Seerr is only worth waiting on for a title it could match, which means the
+    ' plugin is there and the item carries an id Seerr can look up.
+    function SeerrDiscoveryExpected(itemType as string, seerrAvailable as boolean, hasProviderId as boolean) as boolean
+        return SupportsDiscovery(itemType) and seerrAvailable and hasProviderId
+    end function
+
+    ' The details footer is not gated. Every item gets one, which is why it is
+    ' appended rather than asked about.
+    function SectionOrder(state as object) as object
+        sections = []
+
+        if state.itemType = "series" or state.itemType = "season" then sections.push(NOUVEAU_SECTION_EPISODES)
+        if state.chapterCount > 0 then sections.push(NOUVEAU_SECTION_CHAPTERS)
+        if state.extraCount > 0 then sections.push(NOUVEAU_SECTION_EXTRAS)
+        if IncludesDiscovery(state) then sections.push(NOUVEAU_SECTION_DISCOVERY)
+        if state.actorCount > 0 or state.crewCount > 0 then sections.push(NOUVEAU_SECTION_PEOPLE)
+
+        sections.push(NOUVEAU_SECTION_DETAILS)
+        return sections
+    end function
+
+    ' ===== Labels =====
+
+    ' Where a chapter starts, written as a clock reading. The app's duration
+    ' formatter answers how long something runs, so it says "5m" where this wants
+    ' "5:00" and says nothing at all for the very start of a file.
+    function ChapterTime(ticks as longinteger) as string
+        totalSeconds = Int(ticks / 10000000)
+        if totalSeconds < 0 then totalSeconds = 0
+
+        hours = Int(totalSeconds / 3600)
+        minutes = Int(totalSeconds / 60)
+        seconds = totalSeconds mod 60
+
+        secondsText = seconds.toStr()
+        if seconds < 10 then secondsText = "0" + secondsText
+
+        if hours > 0
+            pastHour = minutes mod 60
+            minutesText = pastHour.toStr()
+            if pastHour < 10 then minutesText = "0" + minutesText
+            return `${hours}:${minutesText}:${secondsText}`
+        end if
+
+        return `${minutes}:${secondsText}`
+    end function
+
+    ' Times come off the server written a few different ways, so they are compared
+    ' in one form rather than as typed. Leading zeros go and an hour of zero is
+    ' dropped entirely.
+    function NormalizeTime(value as string) as string
+        text = value.trim()
+        parts = text.split(":")
+
+        if parts.count() = 2 and AllDigits(parts[0])
+            return `${Int(val(parts[0]))}:${parts[1]}`
+        end if
+
+        if parts.count() = 3 and AllDigits(parts[0]) and AllDigits(parts[1])
+            hours = Int(val(parts[0]))
+            minutes = Int(val(parts[1]))
+            if hours = 0 then return `${minutes}:${parts[2]}`
+            minutesText = minutes.toStr()
+            if minutes < 10 then minutesText = "0" + minutesText
+            return `${hours}:${minutesText}:${parts[2]}`
+        end if
+
+        return text
+    end function
+
+    ' A chapter is shown with its start time on the end. Plenty of them are already
+    ' named after that time, so the name is taken apart first and any piece that only
+    ' repeats the time is dropped rather than printed twice.
+    function ChapterDisplayName(rawName as dynamic, startPositionTicks as longinteger) as string
+        clock = ChapterTime(startPositionTicks)
+
+        unique = []
+        name = ""
+        if isValidAndNotEmpty(rawName) then name = rawName
+
+        for each part in name.split("-")
+            trimmed = part.trim()
+            if trimmed = "" then continue for
+
+            seen = false
+            for each held in unique
+                if held = trimmed
+                    seen = true
+                    exit for
+                end if
+            end for
+            if not seen then unique.push(trimmed)
+        end for
+
+        if unique.count() > 0 and NormalizeTime(unique[unique.count() - 1]) = NormalizeTime(clock)
+            unique.pop()
+        end if
+
+        if unique.count() = 0 then return clock
+        return `${unique.join(" - ")} - ${clock}`
+    end function
+
+    ' ===== Seasons =====
+
+    function SeasonLabel(number as integer) as string
+        if number = 0 then return tr("Specials")
+        return substitute(tr("Season {0}"), number.toStr())
+    end function
+
+    ' Season zero is where a server puts specials, so an episode with no season of
+    ' its own lands there rather than being invented into season one.
+    function SeasonOf(episode as object) as integer
+        season = chainLookupReturn(episode, "json.ParentIndexNumber", invalid)
+        if not isValid(season) then return 0
+        return season
+    end function
+
+    ' A series arrives as one flat run of episodes and the screen shows one season
+    ' at a time, so the run is split here and the selector picks which part of it is
+    ' on screen.
+    function GroupEpisodesBySeason(episodes as object) as object
+        ' A run can be hundreds of episodes long, so each one is asked for its
+        ' season and number once and the ordering compares those rather than
+        ' reaching back into the node on every comparison
+        ordered = []
+        for each episode in episodes
+            ordered.push({ season: SeasonOf(episode), number: EpisodeNumberOf(episode), node: episode })
+        end for
+
+        for i = 1 to ordered.count() - 1
+            held = ordered[i]
+            j = i - 1
+            while j >= 0 and SortsAfter(ordered[j], held)
+                ordered[j + 1] = ordered[j]
+                j = j - 1
+            end while
+            ordered[j + 1] = held
+        end for
+
+        numbers = []
+        buckets = {}
+        for each entry in ordered
+            key = entry.season.toStr()
+            if not isValid(buckets[key])
+                buckets[key] = []
+                numbers.push(entry.season)
+            end if
+            buckets[key].push(entry.node)
+        end for
+
+        return { numbers: numbers, buckets: buckets }
+    end function
+
+    ' Season first, then episode number inside it
+    function SortsAfter(left as object, right as object) as boolean
+        if left.season <> right.season then return left.season > right.season
+        return left.number > right.number
+    end function
+
+    function EpisodeNumberOf(episode as object) as integer
+        number = chainLookupReturn(episode, "json.IndexNumber", invalid)
+        if not isValid(number) then return 0
+        return number
+    end function
+
+    ' A season the server has a name for keeps it, since a show can call its seasons
+    ' anything it likes and "Book One" says more than "Season 1".
+    function SeasonOptions(numbers as object, seasons as object) as object
+        named = {}
+        for each season in seasons
+            index = chainLookupReturn(season, "json.IndexNumber", invalid)
+            name = chainLookupReturn(season, "json.Name", "")
+            if isValid(index) and isValidAndNotEmpty(name) then named[index.toStr()] = name.trim()
+        end for
+
+        options = []
+        for each number in numbers
+            label = named[number.toStr()]
+            if not isValidAndNotEmpty(label) then label = SeasonLabel(number)
+            options.push({ id: number.toStr(), label: label })
+        end for
+        return options
+    end function
+
+    ' Whichever season the viewer picked, else the one holding the episode they are
+    ' up to, so a part watched show opens where they left off. A picked season can
+    ' also stop existing, which happens when the episodes arrive after the first
+    ' paint or the title is swapped underneath.
+    function EffectiveSeason(numbers as object, selected as dynamic, nextUpSeason as dynamic) as integer
+        if numbers.count() = 0 then return 0
+
+        for each number in numbers
+            if isValid(selected) and number = selected then return number
+        end for
+        for each number in numbers
+            if isValid(nextUpSeason) and number = nextUpSeason then return number
+        end for
+        return numbers[0]
+    end function
+
+    ' ===== Discovery =====
+
+    ' The same title can arrive twice from two places, once from the library and
+    ' once from Seerr, so matching is by what a title is rather than by the id
+    ' whichever source happened to give it.
+    function IdentityKeys(item as object) as object
+        keys = []
+        if not isValid(item) then return keys
+
+        itemType = LCase(chainLookupReturn(item, "json.Type", chainLookupReturn(item, "Type", "")))
+        mediaType = itemType
+        if itemType = "series" then mediaType = "tv"
+        if itemType = "movie" then mediaType = "movie"
+        if mediaType = "" then mediaType = "unknown"
+
+        tmdbId = chainLookupReturn(item, "json.ProviderIds.Tmdb", "")
+        if not isValidAndNotEmpty(tmdbId) then tmdbId = chainLookupReturn(item, "json._seerrMediaId", "")
+        if isValidAndNotEmpty(tmdbId) then keys.push(`tmdb:${mediaType}:${tmdbId.toStr().trim()}`)
+
+        name = LCase(chainLookupReturn(item, "json.Name", "").trim())
+        if name <> ""
+            year = chainLookupReturn(item, "json.ProductionYear", "")
+            keys.push(`title:${mediaType}:${name}|year:${year}`)
+        end if
+
+        ' Nothing to recognise it by, so it can only ever match itself
+        if keys.count() = 0 then keys.push(`id:${chainLookupReturn(item, "id", "")}`)
+
+        return keys
+    end function
+
+    function SharesIdentity(keys as object, placed as object) as boolean
+        for each key in keys
+            if isValid(placed[key]) then return true
+        end for
+        return false
+    end function
+
+    sub HoldIdentity(keys as object, placed as object)
+        for each key in keys
+            placed[key] = true
+        end for
+    end sub
+
+    function MergedKeys(first as object, second as object) as object
+        merged = {}
+        for each key in first
+            merged[key] = true
+        end for
+        for each key in second
+            merged[key] = true
+        end for
+        return merged
+    end function
+
+    ' Keeps the first of anything that turns up more than once, and drops whatever
+    ' the caller has already placed somewhere else.
+    function Dedupe(items as object, excluded as object) as object
+        seen = {}
+        out = []
+
+        for each item in items
+            keys = IdentityKeys(item)
+            if SharesIdentity(keys, excluded) then continue for
+            if SharesIdentity(keys, seen) then continue for
+            HoldIdentity(keys, seen)
+            out.push(item)
+        end for
+
+        return out
+    end function
+
+    ' What the library already holds leads the rail, Seerr tops it up, and nothing
+    ' appears in both rails.
+    function DiscoveryRails(state as object) as object
+        placed = {}
+        HoldIdentity(IdentityKeys(state.item), placed)
+
+        base = Dedupe(state.similar, placed)
+        head = []
+        tail = []
+        for i = 0 to base.count() - 1
+            if i < NOUVEAU_PROTECTED_COUNT
+                head.push(base[i])
+            else
+                tail.push(base[i])
+            end if
+        end for
+
+        if state.hasSeerr <> true then return { related: base, recommendations: [] }
+
+        headKeys = {}
+        for each item in head
+            HoldIdentity(IdentityKeys(item), headKeys)
+        end for
+
+        recommendations = Dedupe(state.seerrRecommendations, MergedKeys(placed, headKeys))
+
+        recommendationKeys = {}
+        for each item in recommendations
+            HoldIdentity(IdentityKeys(item), recommendationKeys)
+        end for
+
+        related = []
+        related.append(head)
+        related.append(Dedupe(tail, recommendationKeys))
+
+        ' Seerr's own similar list fills whatever room is left, without repeating
+        ' either rail
+        remaining = MergedKeys(placed, recommendationKeys)
+        for each item in related
+            HoldIdentity(IdentityKeys(item), remaining)
+        end for
+
+        related.append(Dedupe(state.seerrSimilar, remaining))
+
+        return { related: related, recommendations: recommendations }
+    end function
+
+    function AllDigits(text as string) as boolean
+        if text = "" then return false
+        for i = 0 to text.len() - 1
+            piece = text.mid(i, 1)
+            if piece < "0" or piece > "9" then return false
+        end for
+        return true
+    end function
+
+end namespace

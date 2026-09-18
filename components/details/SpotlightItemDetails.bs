@@ -426,8 +426,6 @@ sub onCardFocusChanged(event as object)
     end if
 end sub
 
-
-
 ' An episode's hero carries the series name over its own title, then the usual
 ' season and episode numbers in the facts row
 sub populateEpisodeMetadataCompact(itemData as object)
@@ -453,7 +451,6 @@ sub populateEpisodeMetadataCompact(itemData as object)
 
     buildStreamSummary(itemData)
 end sub
-
 
 ' The file facts in the tech row under the facts line, read off the first media
 ' source the way the modern screen does
@@ -481,13 +478,6 @@ sub buildStreamSummary(itemData as object)
 
     techRow.visible = techRow.getChildCount() > 0 and (isValid(sizeNode) and isValidAndNotEmpty(sizeNode.text) or m.top.findNode("techChips").getChildCount() > 0)
 end sub
-
-function formatFileSize(bytes as longinteger) as string
-    size = bytes / 1073741824.0
-    if size >= 1.0 then return str(Int(size * 10) / 10).trim() + " GB"
-    size = bytes / 1048576.0
-    return str(Int(size * 10) / 10).trim() + " MB"
-end function
 
 sub addTechChip(label as string)
     chipsGroup = m.top.findNode("techChips")
@@ -556,38 +546,6 @@ end sub
 sub onUpNextEscape()
 end sub
 
-
-' Actors in front, the people who wrote and directed behind. Anyone credited
-' both ways is listed once.
-function splitCastAndCrew(people as object) as object
-    crew = []
-    crewByName = {}
-
-    for each person in people
-        personType = LCase(chainLookupReturn(person, "json.Type", ""))
-        if personType <> "director" and personType <> "writer" then continue for
-
-        name = chainLookupReturn(person, "json.Name", "")
-        key = LCase(name)
-        existing = crewByName[key]
-        if isValid(existing) then continue for
-
-        crewByName[key] = person
-        crew.push(person)
-    end for
-
-    cast = []
-    for each person in people
-        personType = LCase(chainLookupReturn(person, "json.Type", ""))
-        if personType <> "actor" and personType <> "gueststar" then continue for
-        if isValid(crewByName[LCase(chainLookupReturn(person, "json.Name", ""))]) then continue for
-        cast.push(person)
-    end for
-
-    return { cast: cast, crew: crew }
-end function
-
-
 ' ===== Button host hooks =====
 
 sub appendButtonNode(config as object)
@@ -649,7 +607,6 @@ end sub
 sub updatePlayedIndicator()
     ' No played indicator on the Spotlight hero
 end sub
-
 
 sub refreshAfterVersionChange()
     ' A version swap replaces the whole item payload, so the screen re-reads it
@@ -818,7 +775,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 end function
 
-
 ' The action row is centered across the screen on every detail screen
 sub focusOverview()
     unhighlightAllButtons()
@@ -880,9 +836,6 @@ sub toggleItemFavorite()
 end sub
 
 ' ===== Hero layout =====
-
-
-
 
 ' The Spotlight hero is one column, so each row sits under the last one the way
 ' layoutContainer does on the modern screen, minus the tab grid below

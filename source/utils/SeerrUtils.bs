@@ -1477,8 +1477,10 @@ function SeerrDetailScreenComponent() as string
     user = m.global.session.user
     if user = invalid or user.settings = invalid then return "ModernItemDetails"
 
-    style = user.settings["ui.itemdetail.style"]
-    if isValidStringValue(style) and LCase(style) = "classic" then return "ItemDetails"
+    style = normalizeDetailScreenStyleToken(user.settings["ui.itemdetail.style"])
+    if style = "classic" then return "ItemDetails"
+    if style = "spotlight" then return "SpotlightItemDetails"
+    if style = "nouveau" then return "NouveauItemDetails"
 
     return "ModernItemDetails"
 end function

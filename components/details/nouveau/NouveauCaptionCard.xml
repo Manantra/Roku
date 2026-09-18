@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauCaptionCard" extends="Group">
+    <children>
+        <!-- The artwork and the placeholder share the mask, so the top corners
+            follow the card's own rounding -->
+        <MaskGroup id="artMask">
+            <Rectangle id="artBg" color="#FFFFFF" opacity="0.04" />
+            <Poster id="artImage" loadDisplayMode="scaleToZoom" />
+            <Poster id="placeholderIcon" uri="pkg:/images/icons/detail_series.png"
+                width="42" height="42" blendColor="#FFFFFF4D" visible="false" />
+            <!-- A chapter without a still of its own is still worth naming, so it
+                says what the thing is rather than drawing an icon -->
+            <Label id="placeholderLabel" font="font:SmallSystemFont" color="#FFFFFF59"
+                horizAlign="center" vertAlign="center" wrap="true" maxLines="2" visible="false" />
+        </MaskGroup>
+
+        <Label id="cardTitle" font="font:SmallSystemFont" color="#FFFFFF" />
+        <Label id="cardSubtitle" font="font:SmallSystemFont" color="#FFFFFFA6" />
+
+        <Poster id="cardBorder" uri="pkg:/images/details/cardborder.9.png"
+            loadDisplayMode="scaleToFit" blendColor="#FFFFFF14" />
+        <Poster id="cardFocus" uri="pkg:/images/details/cardborderfocus.9.png"
+            loadDisplayMode="scaleToFit" blendColor="#FFFFFF" visible="false" />
+    </children>
+    <interface>
+        <field id="cardData" type="assocarray" onChange="onCardDataChanged" />
+        <!-- [card width, artwork height] -->
+        <field id="cardSize" type="array" onChange="onCardSizeChanged" />
+        <field id="focused" type="boolean" onChange="onFocusChanged" />
+        <field id="cardHeight" type="float" value="0" />
+    </interface>
+</component>

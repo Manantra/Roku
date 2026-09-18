@@ -49,6 +49,11 @@
     <field id="mediaType" type="string" value="movie" />
     <!-- Whether Seerr had anything to say, so a host can leave the block out entirely -->
     <field id="hasContent" type="boolean" value="false" />
+    <!-- How tall the block came out, so a host laying a page around it knows what room to leave -->
+    <field id="blockHeight" type="float" value="0" />
+    <!-- A host that draws the recommendation and similar titles itself turns the
+        block's own rows off and reads the two item fields instead -->
+    <field id="showRows" type="boolean" value="true" />
     <!-- How far down the block the focused section sits, so a host can scroll it into view -->
     <field id="focusedOffset" type="integer" value="0" alwaysNotify="true" />
     <!-- What Seerr returned, so a host can draw the same titles its own way -->

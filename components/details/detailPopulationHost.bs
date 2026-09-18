@@ -190,6 +190,10 @@ sub layoutMetadataRow()
 
     arranged = detailMetadataLayout.Arrange(detailMetadataLayout.DetailMetadata(), orderSetting, hiddenSetting)
 
+    ' A screen that draws one of these somewhere else on its hero says so, and the
+    ' row leaves it alone rather than dragging it back into the line
+    excluded = isValid(m.metaRowExcludes) ? m.metaRowExcludes : {}
+
     orderedNodeIds = []
     for each item in arranged
         if item.id = "year"
@@ -216,6 +220,7 @@ sub layoutMetadataRow()
     rowHeight = 0
 
     for each id in orderedNodeIds
+        if isValid(excluded[id]) then continue for
         node = m.top.findNode(id)
         if not isValid(node) or not node.visible then continue for
         size = metaPieceSize(id, node)
@@ -276,4 +281,43 @@ function addMetaSeparator(text as string, xPos as float, rowHeight as float) as 
     bounds = dot.boundingRect()
     dot.translation = [xPos, (rowHeight - bounds.height) / 2]
     return bounds.width
+end function
+
+' The people behind a title, split for a screen that lists them all: actors in
+' front, the ones who wrote and directed behind, and anyone credited both ways
+' listed once. The modern screen keeps its own, which merges a person's jobs and
+' caps each list to what its grid can hold.
+function splitCastAndCrew(people as object) as object
+    crew = []
+    crewByName = {}
+
+    for each person in people
+        personType = LCase(chainLookupReturn(person, "json.Type", ""))
+        if personType <> "director" and personType <> "writer" then continue for
+
+        key = LCase(chainLookupReturn(person, "json.Name", ""))
+        if isValid(crewByName[key]) then continue for
+
+        crewByName[key] = person
+        crew.push(person)
+    end for
+
+    cast = []
+    for each person in people
+        personType = LCase(chainLookupReturn(person, "json.Type", ""))
+        if personType <> "actor" and personType <> "gueststar" then continue for
+        if isValid(crewByName[LCase(chainLookupReturn(person, "json.Name", ""))]) then continue for
+        cast.push(person)
+    end for
+
+    return { cast: cast, crew: crew }
+end function
+
+' Two decimal-free sizes, since a file's weight is read at a glance rather than
+' measured
+function formatFileSize(bytes as longinteger) as string
+    size = bytes / 1073741824.0
+    if size >= 1.0 then return str(Int(size * 10) / 10).trim() + " GB"
+    size = bytes / 1048576.0
+    return str(Int(size * 10) / 10).trim() + " MB"
 end function

@@ -1,0 +1,131 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+const NOUVEAU_MENU_ROW_HEIGHT = 68
+const NOUVEAU_MENU_ROW_GAP = 8
+const NOUVEAU_MENU_WIDTH = 512
+const NOUVEAU_MENU_TOP = 92
+const NOUVEAU_MENU_PAD = 24
+const NOUVEAU_MENU_ICON = 34
+const NOUVEAU_MENU_ICON_INSET = 17
+const NOUVEAU_MENU_FILL = 0.06
+const NOUVEAU_MENU_FILL_FOCUSED = 0.1
+
+sub init()
+    m.panel = m.top.findNode("panel")
+    m.panelFill = m.top.findNode("panelFill")
+    m.panelBorder = m.top.findNode("panelBorder")
+    m.menuTitle = m.top.findNode("menuTitle")
+    m.menuList = m.top.findNode("menuList")
+    m.rowFont = m.top.findNode("rowFont")
+
+    m.menuTitle.font.size = 28
+    m.menuTitle.text = tr("More Actions")
+    m.rowFont.font.size = 24
+    m.rows = []
+    m.focusIndex = 0
+
+    m.top.observeField("visible", "onVisibleChanged")
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onActionsChanged()
+    actions = m.top.actions
+    m.menuList.removeChildrenIndex(m.menuList.getChildCount(), 0)
+    m.rows = []
+    m.focusIndex = 0
+    if not isValidAndNotEmpty(actions) then return
+
+    y = 0
+    for each action in actions
+        row = m.menuList.createChild("Group")
+        row.translation = [0, y]
+
+        fill = row.createChild("Poster")
+        fill.uri = "pkg:/images/details/surface12.9.png"
+        fill.loadDisplayMode = "scaleToFit"
+        fill.blendColor = "#FFFFFF"
+        fill.opacity = NOUVEAU_MENU_FILL
+        fill.width = NOUVEAU_MENU_WIDTH
+        fill.height = NOUVEAU_MENU_ROW_HEIGHT
+
+        ' A focused row is marked by its border rather than by inverting, so a list
+        ' of them stays readable at a glance
+        border = row.createChild("Poster")
+        border.uri = "pkg:/images/details/cardfocus12.9.png"
+        border.loadDisplayMode = "scaleToFit"
+        border.blendColor = "#FFFFFF"
+        border.width = NOUVEAU_MENU_WIDTH
+        border.height = NOUVEAU_MENU_ROW_HEIGHT
+        border.visible = false
+
+        icon = row.createChild("Poster")
+        icon.uri = action.icon
+        icon.width = NOUVEAU_MENU_ICON
+        icon.height = NOUVEAU_MENU_ICON
+        icon.translation = [NOUVEAU_MENU_ICON_INSET, NOUVEAU_MENU_ICON_INSET]
+        icon.blendColor = "#FFFFFF"
+
+        label = row.createChild("Label")
+        label.font = m.rowFont.font
+        label.color = "#FFFFFF"
+        label.height = NOUVEAU_MENU_ROW_HEIGHT
+        labelX = NOUVEAU_MENU_ICON_INSET * 2 + NOUVEAU_MENU_ICON
+        label.width = NOUVEAU_MENU_WIDTH - labelX - NOUVEAU_MENU_ICON_INSET
+        label.vertAlign = "center"
+        label.translation = [labelX, 0]
+        label.text = action.label
+
+        m.rows.push({ node: row, fill: fill, border: border, action: action.action })
+        y += NOUVEAU_MENU_ROW_HEIGHT + NOUVEAU_MENU_ROW_GAP
+    end for
+
+    height = NOUVEAU_MENU_TOP + y - NOUVEAU_MENU_ROW_GAP + NOUVEAU_MENU_PAD
+    m.panelFill.height = height
+    m.panelBorder.height = height
+    m.panel.translation = [m.panel.translation[0], (1080 - height) / 2]
+
+    markFocus(0)
+end sub
+
+sub onVisibleChanged()
+    if m.top.visible
+        markFocus(0)
+        m.top.setFocus(true)
+    end if
+end sub
+
+sub markFocus(index as integer)
+    if m.rows.count() = 0 then return
+    if index < 0 then index = 0
+    if index >= m.rows.count() then index = m.rows.count() - 1
+
+    m.focusIndex = index
+    for i = 0 to m.rows.count() - 1
+        m.rows[i].border.visible = i = index
+        m.rows[i].fill.opacity = i = index ? NOUVEAU_MENU_FILL_FOCUSED : NOUVEAU_MENU_FILL
+    end for
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if key = KeyCode.UP
+        markFocus(m.focusIndex - 1)
+        return true
+    else if key = KeyCode.DOWN
+        markFocus(m.focusIndex + 1)
+        return true
+    else if key = KeyCode.OK
+        if m.focusIndex >= 0 and m.focusIndex < m.rows.count()
+            m.top.chosenAction = m.rows[m.focusIndex].action
+        end if
+        return true
+    else if key = KeyCode.BACK
+        m.top.closed = true
+        return true
+    end if
+
+    return false
+end function

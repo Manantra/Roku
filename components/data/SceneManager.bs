@@ -18,12 +18,19 @@ sub refreshNavReference()
 end sub
 
 '
-' Helper function to check if a node is a detail screen type
+' Every detail style relays the same button events, and the rich screens each
+' extend JFScreen rather than one another, so they are named rather than tested
+' against a common subtype
 ' @param node - The scene node to check
-' @return boolean - True if node is an ItemDetails subtype
+' @return boolean - True when the node is one of the detail screens
 function isDetailScreen(node as object) as boolean
     if not isValid(node) then return false
-    return node.isSubType("ItemDetails") or node.isSubType("ModernItemDetails")
+
+    for each name in ["ItemDetails", "ModernItemDetails", "SpotlightItemDetails", "NouveauItemDetails"]
+        if node.isSubType(name) then return true
+    end for
+
+    return false
 end function
 
 '

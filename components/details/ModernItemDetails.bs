@@ -295,7 +295,7 @@ sub buildTabsFromContent(content as object)
         ' The loader hands over one row of people, which the other clients show
         ' as two tabs
         if isStringEqual(rowTitle, tr("Cast"))
-            people = splitCastAndCrew(items)
+            people = splitCastAndCrewLimited(items)
             if people.cast.count() > 0 then pushSection(people.cast, [160, 265], tr("Cast"), "cast")
             if people.crew.count() > 0 then pushSection(people.crew, [160, 265], tr("Crew"), "cast")
             continue for
@@ -387,9 +387,10 @@ sub pushSection(items as object, size as object, label as string, kind as string
     m.sectionTabs.push({ label: label, kind: kind, index: m.sectionItems.count() - 1 })
 end sub
 
-' Actors in front, the people who wrote and directed behind. Anyone credited
-' both ways is listed once, with their jobs on separate lines.
-function splitCastAndCrew(people as object) as object
+' The shared split, plus what this screen's grids need: a person credited more
+' than once keeps their jobs on separate lines, and each list is cut to what its
+' grid can hold.
+function splitCastAndCrewLimited(people as object) as object
     crew = []
     crewByName = {}
 

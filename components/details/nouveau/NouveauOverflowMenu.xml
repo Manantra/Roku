@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauOverflowMenu" extends="Group">
+    <children>
+        <!-- The actions the row could not hold, stretched into a list: full width,
+            and the label always showing rather than only on focus -->
+        <Rectangle width="1920" height="1080" color="#000000" opacity="0.6" />
+        <Group id="panel" translation="[680, 0]">
+            <Poster id="panelFill" uri="pkg:/images/tracks/panel20.9.png"
+                width="560" blendColor="#121418" opacity="0.97" />
+            <Poster id="panelBorder" uri="pkg:/images/tracks/panelborder20.9.png"
+                width="560" blendColor="#FFFFFF1F" />
+            <Label id="menuTitle" translation="[32, 28]" width="496" height="40"
+                font="font:LargeBoldSystemFont" color="#FFFFFF" />
+            <Group id="menuList" translation="[24, 92]" />
+        </Group>
+        <Label id="rowFont" font="font:MediumBoldSystemFont" visible="false" />
+    </children>
+    <interface>
+        <!-- Array of { icon, label, action, id } -->
+        <field id="actions" type="array" onChange="onActionsChanged" />
+        <field id="chosenAction" type="string" alwaysNotify="true" />
+        <field id="closed" type="boolean" alwaysNotify="true" />
+    </interface>
+</component>

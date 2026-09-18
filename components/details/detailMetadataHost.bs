@@ -81,6 +81,7 @@ end sub
 sub onUpcomingEpisodeResolved(event as object)
     drawUpcomingBadge(event.getData())
     layoutMetadataRow()
+    layoutContainer()
 end sub
 
 sub drawUpcomingBadge(text as string)

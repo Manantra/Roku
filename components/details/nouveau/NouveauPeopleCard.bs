@@ -1,0 +1,70 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+' Two lines each, then the card gives up rather than pushing the rail taller than
+' its neighbours
+const NOUVEAU_PERSON_NAME_GAP = 16
+const NOUVEAU_PERSON_NAME_HEIGHT = 42
+const NOUVEAU_PERSON_ROLE_GAP = 6
+const NOUVEAU_PERSON_ROLE_HEIGHT = 37
+const NOUVEAU_PERSON_RING = 2
+
+sub init()
+    m.avatarGroup = m.top.findNode("avatarGroup")
+    m.avatarRing = m.top.findNode("avatarRing")
+    m.avatarMask = m.top.findNode("avatarMask")
+    m.avatarBg = m.top.findNode("avatarBg")
+    m.avatarImage = m.top.findNode("avatarImage")
+    m.personName = m.top.findNode("personName")
+    m.personRole = m.top.findNode("personRole")
+
+    m.personName.font.size = 16
+    m.personRole.font.size = 14
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onCardSizeChanged()
+    size = m.top.cardSize
+    if not isValidAndNotEmpty(size) or size.count() < 2 then return
+
+    width = size[0]
+    avatar = size[1]
+
+    m.avatarGroup.translation = [(width - avatar) / 2, 0]
+    m.avatarRing.width = avatar + NOUVEAU_PERSON_RING * 2
+    m.avatarRing.height = avatar + NOUVEAU_PERSON_RING * 2
+    m.avatarRing.translation = [-NOUVEAU_PERSON_RING, -NOUVEAU_PERSON_RING]
+    m.avatarMask.maskSize = [avatar, avatar]
+    m.avatarBg.width = avatar
+    m.avatarBg.height = avatar
+    m.avatarImage.width = avatar
+    m.avatarImage.height = avatar
+
+    nameY = avatar + NOUVEAU_PERSON_NAME_GAP
+    m.personName.translation = [0, nameY]
+    m.personName.width = width
+    m.personName.height = NOUVEAU_PERSON_NAME_HEIGHT
+    m.personRole.translation = [0, nameY + NOUVEAU_PERSON_NAME_HEIGHT + NOUVEAU_PERSON_ROLE_GAP]
+    m.personRole.width = width
+    m.personRole.height = NOUVEAU_PERSON_ROLE_HEIGHT
+
+    height = nameY + NOUVEAU_PERSON_NAME_HEIGHT + NOUVEAU_PERSON_ROLE_GAP + NOUVEAU_PERSON_ROLE_HEIGHT
+    m.top.cardHeight = height
+end sub
+
+sub onCardDataChanged()
+    data = m.top.cardData
+    if not isValid(data) then return
+
+    m.avatarImage.uri = isValid(data.imageUrl) ? data.imageUrl : ""
+    m.personName.text = isValid(data.name) ? data.name : ""
+    m.personRole.text = isValid(data.role) ? data.role : ""
+    m.personRole.visible = isValidAndNotEmpty(m.personRole.text)
+
+    onCardSizeChanged()
+end sub
+
+sub onFocusChanged()
+    m.avatarRing.blendColor = m.top.focused ? "#FFFFFF" : "#FFFFFF1A"
+end sub

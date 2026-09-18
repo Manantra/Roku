@@ -576,7 +576,7 @@ function usesRichDetailScreen() as boolean
     return not isStringEqual(detailScreenComponent(), "ItemDetails")
 end function
 
-' Picks the classic, modern or spotlight detail screen based on the user setting.
+' Picks the detail screen the user chose.
 function detailScreenComponent() as string
     style = chainLookupReturn(m.global.session, "user.settings.`ui.itemdetail.style`", "modern")
 
@@ -585,7 +585,16 @@ function detailScreenComponent() as string
     style = normalizeDetailScreenStyleToken(style)
     if isStringEqual(style, "classic") then return "ItemDetails"
     if isStringEqual(style, "spotlight") then return "SpotlightItemDetails"
+    if isStringEqual(style, "nouveau") then return "NouveauItemDetails"
     return "ModernItemDetails"
+end function
+
+' An album, an artist and a playlist each have a screen of their own. Nouveau is a
+' page of rails built around a title, and the other clients leave music to those
+' same dedicated screens rather than drawing it there.
+function usesRichMusicScreen() as boolean
+    if isStringEqual(detailScreenComponent(), "NouveauItemDetails") then return false
+    return usesRichDetailScreen()
 end function
 
 function CreateMovieDetailsGroup(movie as object) as dynamic
@@ -613,6 +622,7 @@ function CreateMovieDetailsGroup(movie as object) as dynamic
     itemType = LCase(movieMetaData.json.type)
     group.itemType = itemType
     group.observeField("quickPlayNode", m.port)
+    group.observeFieldScoped("selectedItem", m.port)
     if group.hasField("studioSelected") then group.observeField("studioSelected", m.port)
 
     group.optionsAvailable = false
@@ -767,6 +777,7 @@ function CreateSeriesDetailsGroup(seriesID as string, seriesServerData = invalid
     group = CreateObject("roSGNode", detailScreenComponent())
     group.itemType = "series"
     group.observeField("quickPlayNode", m.port)
+    group.observeFieldScoped("selectedItem", m.port)
     if group.hasField("studioSelected") then group.observeField("studioSelected", m.port)
 
     ' Determine if the resume button needs to be shown
@@ -840,7 +851,7 @@ function CreateArtistView(artist as object) as dynamic
         group.observeField("playAlbumSelected", m.port)
         group.observeField("shuffleAlbumSelected", m.port)
         group.observeField("instantMixSelected", m.port)
-    else if usesRichDetailScreen()
+    else if usesRichMusicScreen()
         group = CreateObject("roSGNode", detailScreenComponent())
         group.itemType = "musicartist"
         group.optionsAvailable = false
@@ -878,7 +889,7 @@ function CreateAlbumView(album as object) as dynamic
 
     startLoadingSpinner()
 
-    if usesRichDetailScreen()
+    if usesRichMusicScreen()
         group = CreateObject("roSGNode", detailScreenComponent())
         group.itemType = "musicalbum"
         group.optionsAvailable = false
@@ -918,7 +929,7 @@ sub CreatePlaylistView(playlist as object)
 
     startLoadingSpinner()
 
-    if usesRichDetailScreen()
+    if usesRichMusicScreen()
         group = CreateObject("roSGNode", detailScreenComponent())
         group.itemType = "playlist"
         group.optionsAvailable = false

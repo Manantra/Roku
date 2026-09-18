@@ -37,5 +37,7 @@
         <field id="buttonAction" type="string" />
         <field id="buttonIndex" type="integer" />
         <field id="highlighted" type="boolean" value="false" onChange="onHighlightChanged" />
+        <!-- A row that keeps one button carrying its word at rest sets this on it -->
+        <field id="leading" type="boolean" value="false" onChange="onHighlightChanged" />
     </interface>
 </component>

@@ -1,0 +1,39 @@
+import "pkg:/source/api/sdk.bs"
+import "pkg:/source/enums/ImageType.bs"
+import "pkg:/source/utils/misc.bs"
+
+' A series arrives as one flat run of episodes and the screen shows a season at a
+' time, so the whole run is fetched once and the selector only changes which part
+' of it is drawn rather than asking the server again.
+
+sub init()
+    m.top.functionName = "loadSeriesEpisodes"
+end sub
+
+sub loadSeriesEpisodes()
+    if not isValidAndNotEmpty(m.top.seriesId)
+        m.top.episodes = []
+        return
+    end if
+
+    data = api.shows.GetEpisodes(m.top.seriesId, {
+        "UserId": m.global.session.user.id,
+        "fields": "Overview,MediaSources,MediaStreams"
+    })
+
+    if not isChainValid(data, "Items")
+        m.top.episodes = []
+        return
+    end if
+
+    results = []
+    for each item in data.Items
+        node = CreateObject("roSGNode", "TVEpisodeData")
+        node.posterURL = api.items.GetImageURL(item.LookupCI("id"), ImageType.PRIMARY, 0, { "maxWidth": 600, "maxHeight": 340, "quality": "90" })
+        node.json = item
+        node.overview = item.overview
+        results.push(node)
+    end for
+
+    m.top.episodes = results
+end sub

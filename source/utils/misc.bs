@@ -1360,8 +1360,7 @@ end function
 ' Detail screen style is shared across clients, but the value spaces differ:
 ' Moonfin-Core syncs the enum name (classic/modern/spotlight/nouveau) while
 ' Smart-TV syncs a version token (v1/v2/v3/v4). This client stores the enum
-' name, so every read path funnels through here. Roku has no Nouveau screen,
-' so nouveau/v4 falls back to modern rather than leaving a token no option owns.
+' name, so every read path funnels through here.
 function normalizeDetailScreenStyleToken(value as dynamic) as string
     if not isValid(value) then return "modern"
 
@@ -1369,7 +1368,7 @@ function normalizeDetailScreenStyleToken(value as dynamic) as string
 
     if token = "classic" or token = "v1" then return "classic"
     if token = "spotlight" or token = "v3" then return "spotlight"
-    if token = "nouveau" or token = "v4" then return "modern"
+    if token = "nouveau" or token = "v4" then return "nouveau"
     if token = "modern" or token = "v2" then return "modern"
 
     return "modern"

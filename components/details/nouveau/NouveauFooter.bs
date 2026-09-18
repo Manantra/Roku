@@ -1,0 +1,359 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/nouveauLayout.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+const NOUVEAU_FOOTER_TITLE_HEIGHT = 38
+const NOUVEAU_FOOTER_TITLE_GAP = 24
+const NOUVEAU_GROUP_GAP = 26
+const NOUVEAU_GROUP_TITLE_HEIGHT = 26
+const NOUVEAU_GROUP_TITLE_GAP = 10
+const NOUVEAU_LINE_HEIGHT = 22
+const NOUVEAU_LINE_GAP = 5
+const NOUVEAU_TRACK_GAP = 7
+const NOUVEAU_TRACK_DETAIL_HEIGHT = 19
+const NOUVEAU_CHIP_HEIGHT = 36
+const NOUVEAU_CHIP_GAP = 8
+const NOUVEAU_CHIP_PAD = 14
+const NOUVEAU_CAPABILITY_GAP = 12
+const NOUVEAU_CAPABILITY_HEIGHT = 22
+const NOUVEAU_RETRY_HEIGHT = 30
+const NOUVEAU_RETRY_PAD = 10
+' The room a status dot takes beside the line it marks
+const NOUVEAU_DOT_GAP = 14
+const NOUVEAU_FOOTER_TAIL = 40
+
+sub init()
+    m.footerTitle = m.top.findNode("footerTitle")
+    m.groups = m.top.findNode("groups")
+    m.groupFont = m.top.findNode("groupFont")
+    m.lineFont = m.top.findNode("lineFont")
+    m.detailFont = m.top.findNode("detailFont")
+
+    m.footerTitle.font.size = 30
+    m.footerTitle.height = NOUVEAU_FOOTER_TITLE_HEIGHT
+    m.footerTitle.text = tr("Details")
+    m.groupFont.font.size = 20
+    m.lineFont.font.size = 16
+    m.detailFont.font.size = 14
+
+    m.focusables = []
+    m.capabilityRow = invalid
+    m.capabilityRetry = invalid
+    m.focusIndex = -1
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+' spec: { studios, seerrHeight, fileName, fileMeta, hasMediaSource, videoLines,
+'         audioRows, subtitleRows }
+sub setContent(spec as object)
+    m.groups.removeChildrenIndex(m.groups.getChildCount(), 0)
+    m.focusables = []
+    m.capabilityRow = invalid
+    m.capabilityRetry = invalid
+    m.focusIndex = -1
+    m.groups.translation = [0, NOUVEAU_FOOTER_TITLE_HEIGHT + NOUVEAU_FOOTER_TITLE_GAP]
+
+    m.cursor = 0
+    m.spacedYet = false
+
+    if isValidAndNotEmpty(spec.studios) then addStudios(spec.studios)
+
+    ' Seerr carries its own labels and drops out on its own when it knows nothing,
+    ' so the host draws it here rather than inside a titled group
+    m.top.seerrY = m.groups.translation[1] + nextGroupTop()
+    if spec.seerrHeight > 0
+        m.cursor = nextGroupTop() + spec.seerrHeight
+        m.spacedYet = true
+    end if
+
+    if spec.hasMediaSource then addFileInformation(spec)
+    if isValidAndNotEmpty(spec.videoLines) then addLines(tr("Video"), spec.videoLines)
+    if isValidAndNotEmpty(spec.audioRows) then addTracks(tr("Audio"), spec.audioRows)
+    if isValidAndNotEmpty(spec.subtitleRows) then addTracks(tr("Subtitles"), spec.subtitleRows)
+
+    m.top.focusCount = m.focusables.count()
+    m.top.footerHeight = m.groups.translation[1] + m.cursor + NOUVEAU_FOOTER_TAIL
+end sub
+
+' Groups sit a step apart, so every one after the first opens with that step
+function nextGroupTop() as float
+    if not m.spacedYet then return m.cursor
+    return m.cursor + NOUVEAU_GROUP_GAP
+end function
+
+' The group is attached before anything is measured, since a label off the tree
+' has no bounds to report
+function startGroup(title as string) as object
+    group = m.groups.createChild("Group")
+    group.translation = [0, nextGroupTop()]
+
+    heading = group.createChild("Label")
+    heading.font = m.groupFont.font
+    heading.color = "#FFFFFFD9"
+    heading.height = NOUVEAU_GROUP_TITLE_HEIGHT
+    heading.text = title
+
+    return group
+end function
+
+sub endGroup(group as object, bodyHeight as float)
+    m.cursor = group.translation[1] + NOUVEAU_GROUP_TITLE_HEIGHT + NOUVEAU_GROUP_TITLE_GAP + bodyHeight
+    m.spacedYet = true
+end sub
+
+function bodyTop() as float
+    return NOUVEAU_GROUP_TITLE_HEIGHT + NOUVEAU_GROUP_TITLE_GAP
+end function
+
+' Studios are names rather than artwork here, so they read as a row of labels
+sub addStudios(studios as object)
+    group = startGroup(tr("Studios"))
+    top = bodyTop()
+
+    x = 0
+    y = 0
+    for each studio in studios
+        chip = group.createChild("Group")
+
+        fill = chip.createChild("Poster")
+        fill.uri = "pkg:/images/details/surface17.9.png"
+        fill.loadDisplayMode = "scaleToFit"
+        fill.blendColor = "#FFFFFF14"
+        fill.height = NOUVEAU_CHIP_HEIGHT
+
+        border = chip.createChild("Poster")
+        border.uri = "pkg:/images/details/cardborderfocus.9.png"
+        border.loadDisplayMode = "scaleToFit"
+        border.blendColor = "#FFFFFF"
+        border.height = NOUVEAU_CHIP_HEIGHT
+        border.visible = false
+
+        label = chip.createChild("Label")
+        label.font = m.lineFont.font
+        label.color = "#FFFFFFCC"
+        label.height = NOUVEAU_CHIP_HEIGHT
+        label.vertAlign = "center"
+        label.translation = [NOUVEAU_CHIP_PAD, 0]
+        label.text = studio.name
+
+        width = label.boundingRect().width + NOUVEAU_CHIP_PAD * 2
+        fill.width = width
+        border.width = width
+
+        if x > 0 and x + width > NOUVEAU_VIEWPORT
+            x = 0
+            y += NOUVEAU_CHIP_HEIGHT + NOUVEAU_CHIP_GAP
+        end if
+
+        chip.translation = [x, top + y]
+        m.focusables.push({ node: chip, border: border, action: "studio", value: studio })
+        x += width + NOUVEAU_CHIP_GAP
+    end for
+
+    endGroup(group, y + NOUVEAU_CHIP_HEIGHT)
+end sub
+
+sub addFileInformation(spec as object)
+    group = startGroup(tr("File Information"))
+    top = bodyTop()
+    y = 0
+
+    if isValidAndNotEmpty(spec.fileName)
+        name = group.createChild("Label")
+        name.font = m.lineFont.font
+        name.color = "#FFFFFFE6"
+        name.width = NOUVEAU_VIEWPORT
+        name.height = NOUVEAU_LINE_HEIGHT * 2
+        name.wrap = true
+        name.maxLines = 2
+        name.translation = [0, top]
+        name.text = spec.fileName
+        y += NOUVEAU_LINE_HEIGHT * 2
+    end if
+
+    if isValidAndNotEmpty(spec.fileMeta)
+        meta = group.createChild("Label")
+        meta.font = m.detailFont.font
+        meta.color = "#FFFFFF80"
+        meta.height = NOUVEAU_LINE_HEIGHT
+        meta.translation = [0, top + y + NOUVEAU_TRACK_GAP]
+        meta.text = spec.fileMeta
+        y += NOUVEAU_TRACK_GAP + NOUVEAU_LINE_HEIGHT
+    end if
+
+    ' Whether the server would hand this file over as it is, or rework it on the
+    ' way. The answer is worth waiting for rather than guessing, so the line says
+    ' it is still asking rather than showing nothing.
+    row = group.createChild("Group")
+    row.translation = [0, top + y + NOUVEAU_CAPABILITY_GAP]
+
+    dot = row.createChild("Poster")
+    dot.uri = "pkg:/images/icons/circle.png"
+    dot.width = 6
+    dot.height = 6
+    dot.translation = [0, 8]
+    dot.visible = false
+
+    label = row.createChild("Label")
+    label.font = m.detailFont.font
+    label.color = "#FFFFFF6B"
+    label.height = NOUVEAU_CAPABILITY_HEIGHT
+    label.text = tr("Checking Direct Play capability...")
+
+    retry = row.createChild("Group")
+    retry.visible = false
+
+    retryBorder = retry.createChild("Poster")
+    retryBorder.uri = "pkg:/images/details/outline6.9.png"
+    retryBorder.loadDisplayMode = "scaleToFit"
+    retryBorder.blendColor = "#FFFFFF"
+    retryBorder.height = NOUVEAU_RETRY_HEIGHT
+    retryBorder.visible = false
+
+    retryLabel = retry.createChild("Label")
+    retryLabel.font = m.detailFont.font
+    retryLabel.color = "#6EA8FE"
+    retryLabel.height = NOUVEAU_RETRY_HEIGHT
+    retryLabel.vertAlign = "center"
+    retryLabel.translation = [NOUVEAU_RETRY_PAD, 0]
+    retryLabel.text = tr("Retry")
+    retryBorder.width = retryLabel.boundingRect().width + NOUVEAU_RETRY_PAD * 2
+
+    m.capabilityRow = row
+    m.capabilityRetry = retry
+    m.capabilityRetryBorder = retryBorder
+    m.capabilityDot = dot
+    m.capabilityLabel = label
+    endGroup(group, y + NOUVEAU_CAPABILITY_GAP + NOUVEAU_CAPABILITY_HEIGHT)
+end sub
+
+' A line of the file's own description, one fact per line the way the server
+' reported them
+sub addLines(title as string, lines as object)
+    group = startGroup(title)
+    top = bodyTop()
+
+    y = 0
+    for each line in lines
+        label = group.createChild("Label")
+        label.font = m.lineFont.font
+        label.color = "#FFFFFFB8"
+        label.height = NOUVEAU_LINE_HEIGHT
+        label.translation = [0, top + y]
+        label.text = line
+        y += NOUVEAU_LINE_HEIGHT + NOUVEAU_LINE_GAP
+    end for
+
+    endGroup(group, y - NOUVEAU_LINE_GAP)
+end sub
+
+' A track, with a dot that fills in on the one actually being used
+sub addTracks(title as string, rows as object)
+    group = startGroup(title)
+    top = bodyTop()
+
+    y = 0
+    for each row in rows
+        line = group.createChild("Group")
+        line.translation = [0, top + y]
+
+        dot = line.createChild("Poster")
+        dot.uri = "pkg:/images/icons/circle.png"
+        dot.width = 5
+        dot.height = 5
+        dot.translation = [0, 7]
+        dot.blendColor = row.active ? "#6EA8FE" : "#FFFFFF38"
+
+        label = line.createChild("Label")
+        label.font = m.lineFont.font
+        label.color = row.active ? "#FFFFFFF0" : "#FFFFFFA8"
+        label.height = NOUVEAU_LINE_HEIGHT
+        label.translation = [NOUVEAU_DOT_GAP, 0]
+        label.text = row.label
+
+        height = NOUVEAU_LINE_HEIGHT
+        if isValidAndNotEmpty(row.detail)
+            detail = line.createChild("Label")
+            detail.font = m.detailFont.font
+            detail.color = "#FFFFFF73"
+            detail.height = NOUVEAU_TRACK_DETAIL_HEIGHT
+            detail.translation = [NOUVEAU_DOT_GAP, NOUVEAU_LINE_HEIGHT + 2]
+            detail.text = row.detail
+            height += 2 + NOUVEAU_TRACK_DETAIL_HEIGHT
+        end if
+
+        y += height + NOUVEAU_TRACK_GAP
+    end for
+
+    endGroup(group, y - NOUVEAU_TRACK_GAP)
+end sub
+
+' state is one of loading, ready, failed or empty
+sub setDirectPlay(state as string, supportsDirect as boolean)
+    if not isValid(m.capabilityRow) then return
+
+    answered = state = "ready"
+    label = m.capabilityLabel
+
+    ' Nothing came back to report on, so there is nothing honest to say
+    m.capabilityRow.visible = state <> "empty"
+    m.capabilityDot.visible = answered
+    m.capabilityRetry.visible = state = "failed"
+    label.translation = [answered ? NOUVEAU_DOT_GAP : 0, 0]
+    label.color = answered ? "#FFFFFF99" : "#FFFFFF6B"
+
+    if answered
+        m.capabilityDot.blendColor = supportsDirect ? "#4CAF50" : "#E5534B"
+        label.text = tr("Direct Play")
+    else if state = "failed"
+        ' A blank line reads as still loading and gives the remote nothing to
+        ' select, so the failure says so and carries the way to try again
+        label.text = tr("Failed to load")
+        m.capabilityRetry.translation = [label.boundingRect().width + 12, (NOUVEAU_CAPABILITY_HEIGHT - NOUVEAU_RETRY_HEIGHT) / 2]
+    else
+        label.text = tr("Checking Direct Play capability...")
+    end if
+
+    rebuildFocusables()
+end sub
+
+' The retry only exists while the check has fallen over, so the list it sits in
+' is rebuilt whenever that changes
+sub rebuildFocusables()
+    kept = []
+    for each entry in m.focusables
+        if entry.action <> "retry" then kept.push(entry)
+    end for
+
+    if isValid(m.capabilityRetry) and m.capabilityRetry.visible
+        kept.push({ node: m.capabilityRetry, border: m.capabilityRetryBorder, action: "retry", value: "" })
+    end if
+
+    m.focusables = kept
+    m.top.focusCount = kept.count()
+end sub
+
+function focusItem(index as integer) as boolean
+    if index < 0 or index >= m.focusables.count() then return false
+
+    m.focusIndex = index
+    for i = 0 to m.focusables.count() - 1
+        m.focusables[i].border.visible = i = index
+    end for
+
+    m.focusables[index].node.setFocus(true)
+    return true
+end function
+
+sub clearFocus()
+    m.focusIndex = -1
+    for each entry in m.focusables
+        entry.border.visible = false
+    end for
+end sub
+
+function selectedAction() as object
+    if m.focusIndex < 0 or m.focusIndex >= m.focusables.count() then return invalid
+    return { action: m.focusables[m.focusIndex].action, value: m.focusables[m.focusIndex].value }
+end function

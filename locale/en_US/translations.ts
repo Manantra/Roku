@@ -45,6 +45,19 @@
         <translation>Cancel</translation>
     </message>
     <message>
+        <source>Checking Direct Play capability...</source>
+        <extracomment>Shown in the Nouveau details footer while the server is asked how it would play the file</extracomment>
+        <translation>Checking Direct Play capability...</translation>
+    </message>
+    <message>
+        <source>Chapters</source>
+        <translation>Chapters</translation>
+    </message>
+    <message>
+        <source>Cast</source>
+        <translation>Cast</translation>
+    </message>
+    <message>
         <source>Choose which buttons appear on the details screen action row and what order they run in. Press OK to show or hide a button, and Left or Right to move it. Play, Resume and Restart always lead the row.</source>
         <translation>Choose which buttons appear on the details screen action row and what order they run in. Press OK to show or hide a button, and Left or Right to move it. Play, Resume and Restart always lead the row.</translation>
     </message>
@@ -65,8 +78,26 @@
         <translation>Connect to Server</translation>
     </message>
     <message>
+        <source>Crew</source>
+        <translation>Crew</translation>
+    </message>
+    <message>
         <source>Custom themes</source>
         <translation>Custom themes</translation>
+    </message>
+    <message>
+        <source>Direct Play</source>
+        <extracomment>Shown in the Nouveau details footer when the server would hand the file over as it is</extracomment>
+        <translation>Direct Play</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Details</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <extracomment>Marks a media track the file itself flags as the default one</extracomment>
+        <translation>Default</translation>
     </message>
     <message>
         <source>Done</source>
@@ -81,8 +112,21 @@
         <translation>Enter Configuration</translation>
     </message>
     <message>
+        <source>Failed to load</source>
+        <translation>Failed to load</translation>
+    </message>
+    <message>
         <source>Favorite</source>
         <translation>Favorite</translation>
+    </message>
+    <message>
+        <source>Forced</source>
+        <extracomment>Marks a subtitle track the file itself flags as forced</extracomment>
+        <translation>Forced</translation>
+    </message>
+    <message>
+        <source>File Information</source>
+        <translation>File Information</translation>
     </message>
     <message>
         <source>Gallery</source>
@@ -149,6 +193,10 @@
         <translation>Moonfin</translation>
     </message>
     <message>
+        <source>More Actions</source>
+        <translation>More Actions</translation>
+    </message>
+    <message>
         <source>Next</source>
         <translation>Next</translation>
     </message>
@@ -189,6 +237,10 @@
         <translation>Please sign in</translation>
     </message>
     <message>
+        <source>Recommendations</source>
+        <translation>Recommendations</translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Reset</translation>
     </message>
@@ -201,6 +253,10 @@
         <translation>Resume</translation>
     </message>
     <message>
+        <source>Retry</source>
+        <translation>Retry</translation>
+    </message>
+    <message>
         <source>Run Setup Again</source>
         <translation>Run Setup Again</translation>
     </message>
@@ -211,6 +267,11 @@
     <message>
         <source>Search</source>
         <translation>Search</translation>
+    </message>
+    <message>
+        <source>Season {0}</source>
+        <extracomment>Labels a season on the Nouveau season selector, where {0} is the season number</extracomment>
+        <translation>Season {0}</translation>
     </message>
     <message>
         <source>Seerr requests</source>
@@ -233,8 +294,22 @@
         <translation>Sign In</translation>
     </message>
     <message>
+        <source>Size: {0}  &#8226;  Format: {1}</source>
+        <extracomment>File size and container in the Nouveau details footer</extracomment>
+        <translation>Size: {0}  &#8226;  Format: {1}</translation>
+    </message>
+    <message>
+        <source>Similar</source>
+        <translation>Similar</translation>
+    </message>
+    <message>
         <source>Skip setup</source>
         <translation>Skip setup</translation>
+    </message>
+    <message>
+        <source>Specials</source>
+        <extracomment>Labels season zero, where a server keeps specials</extracomment>
+        <translation>Specials</translation>
     </message>
     <message>
         <source>Submit</source>
@@ -243,6 +318,10 @@
     <message>
         <source>Subtitle</source>
         <translation>Subtitle</translation>
+    </message>
+    <message>
+        <source>Subtitles</source>
+        <translation>Subtitles</translation>
     </message>
     <message>
         <source>SyncPlay watch parties</source>
@@ -261,8 +340,17 @@
         <translation>Trailer</translation>
     </message>
     <message>
+        <source>Unknown Codec</source>
+        <translation>Unknown Codec</translation>
+    </message>
+    <message>
         <source>Unwatched</source>
         <translation>Unwatched</translation>
+    </message>
+    <message>
+        <source>Up Next</source>
+        <extracomment>Marks the episode the viewer is up to on a Nouveau episode card</extracomment>
+        <translation>Up Next</translation>
     </message>
     <message>
         <source>Versions</source>

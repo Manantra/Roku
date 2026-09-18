@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauLandscapeCard" extends="Group">
+    <children>
+        <!-- The one card with two halves: the artwork plays it and the block
+            underneath opens it, so the remote can do either without a menu in
+            between -->
+        <Group id="artwork">
+            <MaskGroup id="artMask" maskUri="pkg:/images/details/nouveau/mask_landscape.png">
+                <Rectangle id="artBg" color="#FFFFFF" opacity="0.04" />
+                <Poster id="artImage" loadDisplayMode="scaleToZoom" />
+                <Label id="placeholderLabel" font="font:SmallSystemFont" color="#FFFFFF59"
+                    horizAlign="center" vertAlign="center" wrap="true" maxLines="2" visible="false" />
+                <Rectangle id="progressTrack" color="#FFFFFF" opacity="0.25" height="4" visible="false">
+                    <Rectangle id="progressFill" color="#6EA8FE" height="4" />
+                </Rectangle>
+            </MaskGroup>
+            <!-- Marks the one the viewer is up to, which is the whole reason to
+                open a series rail -->
+            <Group id="nextUpBadge" translation="[8, 8]" visible="false">
+                <Poster id="nextUpFill" uri="pkg:/images/details/surface12.9.png"
+                    loadDisplayMode="scaleToFit" blendColor="#6EA8FE" height="24" />
+                <Label id="nextUpText" font="font:SmallestBoldSystemFont" color="#000000"
+                    height="24" vertAlign="center" horizAlign="center" />
+            </Group>
+            <Poster id="artBorder" uri="pkg:/images/details/cardborder.9.png"
+                loadDisplayMode="scaleToFit" blendColor="#FFFFFF14" />
+            <Poster id="artFocus" uri="pkg:/images/details/cardborderfocus.9.png"
+                loadDisplayMode="scaleToFit" blendColor="#FFFFFF" visible="false" />
+        </Group>
+
+        <Group id="details">
+            <Poster id="detailsFill" uri="pkg:/images/details/surface17.9.png"
+                loadDisplayMode="scaleToFit" blendColor="#0B0D10" opacity="0.88" />
+            <Poster id="detailsBorder" uri="pkg:/images/details/cardborder.9.png"
+                loadDisplayMode="scaleToFit" blendColor="#FFFFFF1C" />
+            <Poster id="detailsFocus" uri="pkg:/images/details/cardborderfocus.9.png"
+                loadDisplayMode="scaleToFit" blendColor="#FFFFFF" visible="false" />
+            <Label id="detailsTitle" font="font:SmallSystemFont" color="#FFFFFF" />
+            <!-- Kept to a fixed two lines whether or not it fills them, so a rail
+                of cards with uneven summaries still lines up along the bottom -->
+            <Label id="detailsOverview" font="font:SmallSystemFont" color="#FFFFFF9E"
+                wrap="true" maxLines="2" />
+        </Group>
+    </children>
+    <interface>
+        <field id="cardData" type="assocarray" onChange="onCardDataChanged" />
+        <!-- [card width, artwork height] -->
+        <field id="cardSize" type="array" onChange="onCardSizeChanged" />
+        <!-- 0 is the artwork, 1 the block under it, -1 neither -->
+        <field id="focusPart" type="integer" value="-1" onChange="onFocusPartChanged" />
+        <field id="cardHeight" type="float" value="0" />
+    </interface>
+</component>

@@ -1,0 +1,87 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/nouveauLayout.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+' Artwork with a title and a second line under it, which is what the discovery,
+' chapters and extras rails are all made of. The rail works out the width and the
+' height follows from it, so nothing here guesses at a size.
+
+sub init()
+    m.artMask = m.top.findNode("artMask")
+    m.artBg = m.top.findNode("artBg")
+    m.artImage = m.top.findNode("artImage")
+    m.placeholderIcon = m.top.findNode("placeholderIcon")
+    m.placeholderLabel = m.top.findNode("placeholderLabel")
+    m.cardTitle = m.top.findNode("cardTitle")
+    m.cardSubtitle = m.top.findNode("cardSubtitle")
+    m.cardBorder = m.top.findNode("cardBorder")
+    m.cardFocus = m.top.findNode("cardFocus")
+
+    m.cardTitle.font.size = 17
+    m.cardSubtitle.font.size = 15
+    m.placeholderLabel.font.size = 15
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onCardSizeChanged()
+    size = m.top.cardSize
+    if not isValidAndNotEmpty(size) or size.count() < 2 then return
+
+    width = size[0]
+    artHeight = size[1]
+
+    ' Artwork taller than it is wide is a poster, anything else a still, and each
+    ' shape is cut with the mask drawn for it
+    if artHeight > width
+        m.artMask.maskUri = "pkg:/images/details/nouveau/mask_poster.png"
+    else
+        m.artMask.maskUri = "pkg:/images/details/nouveau/mask_media.png"
+    end if
+    m.artMask.maskSize = [width, artHeight]
+
+    m.artBg.width = width
+    m.artBg.height = artHeight
+    m.artImage.width = width
+    m.artImage.height = artHeight
+    m.placeholderIcon.translation = [(width - m.placeholderIcon.width) / 2, (artHeight - m.placeholderIcon.height) / 2]
+    m.placeholderLabel.width = width
+    m.placeholderLabel.height = artHeight
+
+    captionY = artHeight + NOUVEAU_CAPTION_GAP
+    m.cardTitle.translation = [0, captionY]
+    m.cardTitle.width = width
+    m.cardTitle.height = NOUVEAU_TITLE_HEIGHT
+    m.cardSubtitle.translation = [0, captionY + NOUVEAU_TITLE_HEIGHT]
+    m.cardSubtitle.width = width
+    m.cardSubtitle.height = NOUVEAU_SUBTITLE_HEIGHT
+
+    height = captionY + NOUVEAU_TITLE_HEIGHT + NOUVEAU_SUBTITLE_HEIGHT
+    m.cardBorder.width = width
+    m.cardBorder.height = height
+    m.cardFocus.width = width
+    m.cardFocus.height = height
+    m.top.cardHeight = height
+end sub
+
+sub onCardDataChanged()
+    data = m.top.cardData
+    if not isValid(data) then return
+
+    hasImage = isValidAndNotEmpty(data.imageUrl)
+    m.artImage.uri = hasImage ? data.imageUrl : ""
+
+    m.placeholderLabel.text = isValidAndNotEmpty(data.placeholder) ? UCase(data.placeholder) : ""
+    m.placeholderLabel.visible = not hasImage and m.placeholderLabel.text <> ""
+    m.placeholderIcon.visible = not hasImage and not m.placeholderLabel.visible
+
+    m.cardTitle.text = isValid(data.title) ? data.title : ""
+    m.cardSubtitle.text = isValid(data.subtitle) ? data.subtitle : ""
+    m.cardSubtitle.visible = isValidAndNotEmpty(m.cardSubtitle.text)
+
+    onCardSizeChanged()
+end sub
+
+sub onFocusChanged()
+    m.cardFocus.visible = m.top.focused
+end sub

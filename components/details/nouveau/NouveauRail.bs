@@ -1,0 +1,176 @@
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/nouveauLayout.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+' One rail: a heading and a row of cards the caller describes. Up and down belong
+' to the page, so the screen answers those. Left and right belong to the rail, and
+' it is the rail that knows where its cards sit and how far to slide the track.
+'
+' A rail opens with about a screen of cards and grows as focus nears the end of
+' what is built, so a long one is only built in full for somebody who walks
+' through it.
+
+const NOUVEAU_RAIL_TITLE_HEIGHT = 38
+const NOUVEAU_RAIL_TITLE_GAP = 20
+' Room kept above and below the cards, so a rail sits clear of its neighbours
+const NOUVEAU_FOCUS_CLEARANCE = 20
+' How much of a card is kept clear of the edge once focus reaches it
+const NOUVEAU_SCROLL_CLEARANCE = 50
+
+const NOUVEAU_CARD_WINDOW = 10
+const NOUVEAU_CARD_WINDOW_STEP = 8
+const NOUVEAU_CARD_WINDOW_EDGE = 2
+
+sub init()
+    m.railTitle = m.top.findNode("railTitle")
+    m.viewport = m.top.findNode("viewport")
+    m.track = m.top.findNode("track")
+
+    m.railTitle.font.size = 30
+    m.spec = invalid
+    m.built = 0
+    m.cardHeight = 0
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+' spec: { title, component, cardSize, gap, stopsPerCard, cards }
+sub setContent(spec as object)
+    m.spec = spec
+    m.built = 0
+    m.cardHeight = 0
+    m.track.removeChildrenIndex(m.track.getChildCount(), 0)
+    m.track.translation = [0, 0]
+    m.top.focusedStop = -1
+
+    hasTitle = isValidAndNotEmpty(spec.title)
+    m.railTitle.text = hasTitle ? spec.title : ""
+    m.railTitle.visible = hasTitle
+    m.railTitle.height = NOUVEAU_RAIL_TITLE_HEIGHT
+
+    topOffset = 0
+    if hasTitle then topOffset = NOUVEAU_RAIL_TITLE_HEIGHT + NOUVEAU_RAIL_TITLE_GAP
+    m.viewport.translation = [0, topOffset + NOUVEAU_FOCUS_CLEARANCE]
+
+    buildThrough(NOUVEAU_CARD_WINDOW)
+
+    m.top.stopCount = spec.cards.count() * spec.stopsPerCard
+    m.top.railHeight = topOffset + NOUVEAU_FOCUS_CLEARANCE * 2 + m.cardHeight
+    m.viewport.clippingRect = [0, 0, NOUVEAU_VIEWPORT, m.cardHeight]
+end sub
+
+' Cards are built up to the count asked for, never rebuilt, so a card already on
+' screen keeps whatever the viewer has done to it
+sub buildThrough(count as integer)
+    spec = m.spec
+    if not isValid(spec) then return
+
+    total = spec.cards.count()
+    if count > total then count = total
+    if count <= m.built then return
+
+    x = 0
+    if m.built > 0
+        last = m.track.getChild(m.built - 1)
+        x = last.translation[0] + spec.cardSize[0] + spec.gap
+    end if
+
+    for i = m.built to count - 1
+        node = CreateObject("roSGNode", spec.component)
+        if not isValid(node) then exit for
+
+        ' roSGNode has no way to ask a child what index it sits at, so the
+        ' position is stamped on the node while it is known
+        node.addFields({ cardIndex: i })
+        node.cardSize = spec.cardSize
+        node.cardData = spec.cards[i]
+        node.translation = [x, 0]
+        m.track.appendChild(node)
+
+        if node.cardHeight > m.cardHeight then m.cardHeight = node.cardHeight
+        x += spec.cardSize[0] + spec.gap
+    end for
+
+    m.built = count
+end sub
+
+function cardIndexForStop(stopIndex as integer) as integer
+    if not isValid(m.spec) then return -1
+    return Int(stopIndex / m.spec.stopsPerCard)
+end function
+
+function partForStop(stopIndex as integer) as integer
+    if not isValid(m.spec) then return 0
+    return stopIndex mod m.spec.stopsPerCard
+end function
+
+function focusStop(stopIndex as integer) as boolean
+    if not isValid(m.spec) then return false
+    if stopIndex < 0 or stopIndex >= m.top.stopCount then return false
+
+    index = cardIndexForStop(stopIndex)
+
+    ' The cards behind the one being reached have to exist before it can be, so
+    ' the window grows to cover it and a little beyond
+    if index >= m.built - NOUVEAU_CARD_WINDOW_EDGE
+        buildThrough(index + 1 + NOUVEAU_CARD_WINDOW_STEP)
+    end if
+
+    card = m.track.getChild(index)
+    if not isValid(card) then return false
+
+    applyFocus(stopIndex)
+    slideTo(index)
+    card.setFocus(true)
+    return true
+end function
+
+sub clearFocus()
+    applyFocus(-1)
+end sub
+
+' A card either has two halves to mark or one, and a stop below zero marks none
+sub applyFocus(stopIndex as integer)
+    m.top.focusedStop = stopIndex
+
+    index = -1
+    part = -1
+    if stopIndex >= 0
+        index = cardIndexForStop(stopIndex)
+        part = partForStop(stopIndex)
+    end if
+
+    for i = 0 to m.track.getChildCount() - 1
+        child = m.track.getChild(i)
+        if not isValid(child) then continue for
+
+        if child.hasField("focusPart")
+            child.focusPart = i = index ? part : -1
+        else if child.hasField("focused")
+            child.focused = i = index
+        end if
+    end for
+end sub
+
+' The track slides only far enough to keep the focused card clear of either edge,
+' so the rail holds still while focus walks across what is already on screen
+sub slideTo(index as integer)
+    spec = m.spec
+    offset = m.track.translation[0]
+    left = index * (spec.cardSize[0] + spec.gap) + offset
+    right = left + spec.cardSize[0]
+
+    if left < NOUVEAU_SCROLL_CLEARANCE
+        offset += NOUVEAU_SCROLL_CLEARANCE - left
+        if offset > 0 then offset = 0
+    else if right > NOUVEAU_VIEWPORT - NOUVEAU_SCROLL_CLEARANCE
+        offset -= right - (NOUVEAU_VIEWPORT - NOUVEAU_SCROLL_CLEARANCE)
+
+        trackWidth = spec.cards.count() * (spec.cardSize[0] + spec.gap) - spec.gap
+        limit = NOUVEAU_VIEWPORT - trackWidth
+        if limit > 0 then limit = 0
+        if offset < limit then offset = limit
+    end if
+
+    m.track.translation = [offset, 0]
+end sub

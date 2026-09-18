@@ -86,6 +86,11 @@ sub onLabelChanged()
     end if
 end sub
 
+sub inkLabels(ink as string)
+    m.label.color = ink
+    m.detail.color = ink
+end sub
+
 sub onHighlightChanged()
     textWidth = m.label.boundingRect().width
     if m.detail.visible and m.detail.boundingRect().width > textWidth
@@ -97,6 +102,7 @@ sub onHighlightChanged()
         m.bg.blendColor = themeChrome.Token("buttonFocused", "#FFFFFF")
         m.bg.opacity = FOCUSED_FILL_OPACITY
         m.icon.blendColor = themeChrome.Token("onButtonFocused", "#000000FF")
+        inkLabels(themeChrome.Token("onButtonFocused", "#000000FF"))
         m.border.visible = false
         m.borderFocus.visible = true
         m.borderFocus.blendColor = themeChrome.Token("inputBorderFocused", "#FFFFFF")
@@ -104,8 +110,12 @@ sub onHighlightChanged()
         m.labelOpacityInterp.keyValue = [m.text.opacity, 1]
     else
         applyRestingColours()
-        targetWidth = m.collapsedWidth
-        m.labelOpacityInterp.keyValue = [m.text.opacity, 0]
+        ' A leading button carries its word whether or not it holds focus, and on
+        ' the resting glass that word needs the light ink rather than the dark one
+        ' the focused pill takes
+        inkLabels(themeChrome.Token("onButtonNormal", "#FFFFFFFF"))
+        targetWidth = m.top.leading ? expandedWidth : m.collapsedWidth
+        m.labelOpacityInterp.keyValue = [m.text.opacity, m.top.leading ? 1 : 0]
     end if
 
     m.bgWidthInterp.keyValue = [m.bg.width, targetWidth]

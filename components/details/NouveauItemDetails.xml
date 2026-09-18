@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauItemDetails" extends="JFScreen">
+    <children>
+        <!-- Five layers keep the page readable over the artwork: a flat wash, a
+            fade in from the left under the hero text, a rise from the bottom under
+            the rails, a scrim across the top, and a vignette that darkens the far
+            corner -->
+        <Rectangle width="1920" height="1080" color="#0B0D10" />
+        <Poster id="backdrop" width="1920" height="1080" loadDisplayMode="scaleToFill" />
+        <Rectangle id="backdropScrim" width="1920" height="1080" color="#000000" opacity="0.8" />
+        <Poster id="backdropVignette" width="1920" height="1080"
+            uri="pkg:/images/details/nouveau/scrim_vignette.png"
+            blendColor="#000000" loadDisplayMode="scaleToFill" />
+        <Poster id="backdropTopScrim" width="1920" height="454"
+            uri="pkg:/images/details/nouveau/scrim_top.png"
+            blendColor="#000000" loadDisplayMode="scaleToFill" />
+        <Poster id="backdropBottomScrim" width="1920" height="1080"
+            uri="pkg:/images/details/nouveau/scrim_bottom.png"
+            blendColor="#0B0D10" loadDisplayMode="scaleToFill" />
+        <Poster id="backdropLeftScrim" width="1574" height="1080"
+            uri="pkg:/images/details/nouveau/scrim_left.png"
+            blendColor="#0B0D10" loadDisplayMode="scaleToFill" />
+
+        <Group id="scrollableContent">
+            <Group>
+                <!-- The hero: one left aligned column over the backdrop, read top
+                    to bottom. What the title is, what state it is in, the facts
+                    about it, what the file is, how it was rated, what it is about,
+                    and then what can be done with it. -->
+                <Group translation="[56, 130]">
+                    <Text id="metaGenres" font="font:SmallestBoldSystemFont" width="680"
+                        maxLines="1" color="#FFFFFFA3" />
+
+                    <Group id="logoGroup" visible="false">
+                        <Poster id="logoImage" loadDisplayMode="scaleToFit" width="480" height="106" />
+                        <!-- A season's logo belongs to its series, so the season's
+                            own name goes beside it -->
+                        <Label id="companionTitle" font="font:LargeBoldSystemFont"
+                            color="#FFFFFF" visible="false" />
+                    </Group>
+
+                    <Text id="title" font="font:LargeBoldSystemFont" width="680" wrap="true"
+                        maxLines="2" color="#FFFFFF" visible="false" />
+
+                    <!-- Kept out of the hero flow, the metadata host still asks for
+                        it by name -->
+                    <Text id="episodeHeader" visible="false" />
+
+                    <Group id="badgesRow" visible="false">
+                        <Group id="statusBadge" visible="false">
+                            <Poster id="statusBadgeBg" uri="pkg:/images/details/badgefill6.9.png"
+                                loadDisplayMode="scaleToFit" />
+                            <Label id="statusBadgeText" font="font:SmallestBoldSystemFont"
+                                color="#FFFFFF" vertAlign="center" horizAlign="center" />
+                        </Group>
+                        <Group id="upcomingBadge" visible="false">
+                            <Poster id="upcomingBadgeBg" uri="pkg:/images/details/badgefill6.9.png"
+                                loadDisplayMode="scaleToFit" />
+                            <Poster id="upcomingBadgeIcon" uri="pkg:/images/details/calendar.png"
+                                width="18" height="18" blendColor="#FFFFFF" />
+                            <Label id="upcomingBadgeText" font="font:SmallestBoldSystemFont"
+                                color="#FFFFFF" vertAlign="center" horizAlign="center" />
+                        </Group>
+                    </Group>
+
+                    <Group id="metadataRow">
+                        <Text id="releaseYear" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        <Text id="officialRating" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        <Text id="seasonCount" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        <Text id="episodeNumber" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        <Group id="runtimeGroup">
+                            <Poster id="runtimeIcon" uri="pkg:/images/details/schedule.png"
+                                width="20" height="20" blendColor="#FFFFFFA8" />
+                            <Text id="runtime" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        </Group>
+                        <Text id="endsAt" font="font:SmallestSystemFont" color="#FFFFFFA8" />
+                        <Group id="metaSeparators" />
+                    </Group>
+
+                    <!-- What the file is, rather than what the title is -->
+                    <Group id="techRow" visible="false">
+                        <Text id="techSize" font="font:SmallestSystemFont" color="#FFFFFFB3" />
+                        <Group id="techChips" />
+                        <Text id="techChipFont" font="font:SmallestSystemFont" visible="false" />
+                    </Group>
+
+                    <RatingsRow id="ratingsRow" visible="false" />
+
+                    <ExpandableOverview id="overview" visible="false" />
+
+                    <Rectangle id="buttonRowContainer" width="1808" height="75" color="#00000000">
+                        <Group id="buttonRow" />
+                    </Rectangle>
+                </Group>
+
+                <!-- Every rail on the page, appended as its section fills in -->
+                <Group id="sections" />
+
+                <!-- A season is only committed when it is chosen, since following
+                    focus along the selector would swap the rail out from under
+                    every press -->
+                <DetailTabBar id="seasonBar" visible="false" />
+
+                <SeerrDetailBlock id="seerrBlock" visible="false" />
+                <NouveauFooter id="footer" visible="false" />
+            </Group>
+        </Group>
+
+        <NouveauOverflowMenu id="overflowMenu" visible="false" />
+
+        <AudioSelector id="audioSelector" visible="false" />
+        <SubtitleSelector id="subtitleSelector" visible="false" />
+        <SubtitleDownloadDialog id="subtitleDownloadDialog" visible="false" />
+        <VersionSelector id="versionSelector" visible="false" />
+        <ThemeMusicPlayer id="themeMusicPlayer" />
+        <FavoriteItemsTask id="favoriteTask" />
+        <PlaystateTask id="playstateTask" />
+
+        <Animation id="scrollAnimation" duration="0.35" repeat="false" easeFunction="inOutQuad">
+            <Vector2DFieldInterpolator id="scrollInterpolator"
+                key="[0.0, 1.0]"
+                keyValue="[[0, 0], [0, 0]]"
+                fieldToInterp="scrollableContent.translation" />
+        </Animation>
+    </children>
+    <interface>
+        <field id="seerrButtonsStale" type="boolean" alwaysNotify="true" />
+        <field id="buttonSelected" type="string" alwaysNotify="true" />
+        <field id="studioSelected" type="assocarray" alwaysNotify="true" />
+        <field id="selectedItem" type="node" alwaysNotify="true" />
+        <field id="itemContent" type="node" />
+        <field id="seerrTarget" type="assocarray" onChange="onSeerrTargetChanged" />
+        <field id="seerrOnly" type="boolean" value="false" />
+        <field id="itemType" type="string" value="movie" />
+        <field id="trailerAvailable" type="bool" value="false" />
+        <field id="selectedPart" type="assocarray" onChange="onSelectedPartChanged" />
+        <field id="selectedAudioStreamIndex" type="integer" />
+        <field id="selectedVideoStreamId" type="string" />
+        <field id="quickPlayNode" type="node" alwaysNotify="true" />
+        <field id="refreshMovieDetailsData" type="bool" alwaysNotify="true" />
+        <field id="refreshEpisodeDetailsData" type="bool" alwaysNotify="true" />
+        <field id="refreshSeriesDetailsData" type="bool" alwaysNotify="true" />
+        <field id="logoImageURI" type="string" onChange="onLogoImageURIChanged" />
+        <field id="seasonData" type="node" />
+        <field id="displayResumeButton" type="bool" onChange="onDisplayResumeButtonChange" />
+        <field id="playSeasonFromStart" type="bool" alwaysNotify="true" />
+        <field id="refreshSeasonDetailsData" type="bool" alwaysNotify="true" />
+        <field id="seasonSelected" type="node" alwaysNotify="true" />
+        <field id="playSeriesFromStart" type="bool" alwaysNotify="true" />
+        <field id="seasonEpisodesData" type="assocarray" onChange="onSeasonEpisodesLoaded" />
+    </interface>
+</component>

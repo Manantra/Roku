@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="NouveauFooter" extends="Group">
+    <children>
+        <!-- What the page closes on: who made the title, and what the file behind
+            it actually is. Groups sit apart from each other rather than in a box,
+            since the page already has a shape. -->
+        <Label id="footerTitle" font="font:LargeBoldSystemFont" color="#FFFFFF" />
+        <Group id="groups" />
+        <!-- Never shown, they lend their fonts to the rows built at runtime -->
+        <Label id="groupFont" font="font:MediumBoldSystemFont" visible="false" />
+        <Label id="lineFont" font="font:SmallSystemFont" visible="false" />
+        <Label id="detailFont" font="font:SmallestSystemFont" visible="false" />
+    </children>
+    <interface>
+        <field id="footerHeight" type="float" value="0" />
+        <!-- Where in the footer a host should place its own Seerr block -->
+        <field id="seerrY" type="float" value="0" />
+        <field id="focusCount" type="integer" value="0" />
+        <function name="setContent" />
+        <function name="setDirectPlay" />
+        <function name="focusItem" />
+        <function name="clearFocus" />
+        <function name="selectedAction" />
+    </interface>
+</component>
