@@ -1,0 +1,853 @@
+import "pkg:/source/utils/achievementsIcons.bs"
+import "pkg:/source/utils/achievementsModel.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+import "pkg:/source/utils/themeChrome.bs"
+
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/TaskControl.bs"
+
+' The Achievement Badges panel. Every screen renders from the one load so moving between them
+' costs nothing, and only the leaderboard and the recap ask the server for anything more.
+'
+' The panel keeps its own stack of views rather than pushing scenes, so BACK walks back through
+' them one at a time and lands on the settings entry it was opened from.
+
+const ACHIEVEMENT_PANEL_X = 1146
+const ACHIEVEMENT_PANEL_WIDTH = 747
+const ACHIEVEMENT_PANEL_TOP = 80
+const ACHIEVEMENT_TAB_BAR_HEIGHT = 63
+const ACHIEVEMENT_SECTION_GAP = 24
+const ACHIEVEMENT_CHIP_HEIGHT = 44
+const ACHIEVEMENT_CHIP_GAP = 10
+const ACHIEVEMENT_CHIP_PAD = 18
+const ACHIEVEMENT_CHIP_ICON = 26
+const ACHIEVEMENT_CHIP_ICON_INSET = 14
+const ACHIEVEMENT_CHIP_ICON_GAP = 10
+const ACHIEVEMENT_SHOWCASE_ITEM = 150
+const ACHIEVEMENT_SHOWCASE_AVATAR = 84
+const ACHIEVEMENT_SHOWCASE_ICON = 44
+const ACHIEVEMENT_SHOWCASE_TITLE_GAP = 10
+const ACHIEVEMENT_SHOWCASE_TITLE_HEIGHT = 50
+
+' The rank block, read top to bottom
+const ACHIEVEMENT_RANK_AVATAR = 88
+const ACHIEVEMENT_RANK_ROW_GAP = 18
+const ACHIEVEMENT_RANK_BAR_HEIGHT = 10
+const ACHIEVEMENT_RANK_BAR_GAP = 10
+const ACHIEVEMENT_RANK_NOTE_HEIGHT = 30
+const ACHIEVEMENT_CHIPS_GAP = 20
+const ACHIEVEMENT_SHOWCASE_GAP = 12
+
+sub init()
+    m.path = m.top.findNode("path")
+    m.header = m.top.findNode("header")
+    m.rankRow = m.top.findNode("rankRow")
+    m.rankFill = m.top.findNode("rankFill")
+    m.rankBorder = m.top.findNode("rankBorder")
+    m.rankIcon = m.top.findNode("rankIcon")
+    m.rankName = m.top.findNode("rankName")
+    m.rankScore = m.top.findNode("rankScore")
+    m.rankBarTrack = m.top.findNode("rankBarTrack")
+    m.rankBarFill = m.top.findNode("rankBarFill")
+    m.rankNote = m.top.findNode("rankNote")
+    m.chips = m.top.findNode("chips")
+    m.chipFont = m.top.findNode("chipFont")
+    m.showcase = m.top.findNode("showcase")
+
+    m.tabBar = m.top.findNode("tabBar")
+    m.tabBar.maxWidth = ACHIEVEMENT_PANEL_WIDTH
+    m.tabBar.observeField("activated", "onTabActivated")
+    m.tabBar.observeField("escape", "onTabEscape")
+
+    m.rowList = m.top.findNode("rowList")
+    m.rowList.observeField("itemSelected", "onRowSelected")
+    m.rowList.observeField("itemFocused", "onRowFocused")
+
+    m.skipHeadingTimer = m.top.findNode("skipHeadingTimer")
+    m.skipHeadingTimer.observeField("fire", "onSkipHeadingTimer")
+    m.lastFocusIndex = 0
+    m.pendingFocusIndex = -1
+
+    m.message = m.top.findNode("message")
+    m.retryButton = m.top.findNode("retryButton")
+    m.retryFocus = m.top.findNode("retryFocus")
+    m.top.findNode("retryLabel").text = tr("Retry")
+
+    m.loadTask = m.top.findNode("loadTask")
+    m.loadTask.observeField("result", "onLoadResult")
+
+    m.chipFont.font.size = 22
+    m.rankName.font.size = 34
+    m.rankScore.font.size = 24
+    m.rankNote.font.size = 22
+
+    m.accent = themeChrome.Accent()
+    m.overview = invalid
+    m.loading = true
+    m.view = "overview"
+    m.stack = []
+    m.badgeFilter = achievementsModel.BadgeFilters()[0]
+    m.openCategories = {}
+    m.board = boardIds()[0]
+    m.period = ACHIEVEMENTS_DEFAULT_PERIOD
+    m.boardEntries = []
+    m.recap = invalid
+    m.rows = []
+    m.onRetry = false
+
+    m.top.optionsAvailable = false
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub OnScreenShown(_isReturning = false as boolean)
+    if isValid(m.overview) or not m.loading then return
+    startLoad({ kind: "overview" })
+end sub
+
+sub startLoad(request as object)
+    m.loading = true
+    render()
+    m.loadTask.control = TaskControl.STOP
+    m.loadTask.request = request
+    m.loadTask.control = TaskControl.RUN
+end sub
+
+sub onLoadResult(event as object)
+    result = event.getData()
+    if not isValid(result) then return
+
+    m.loading = false
+    if result.kind = "leaderboard"
+        m.boardEntries = result.entries
+    else if result.kind = "recap"
+        m.recap = result.recap
+    else
+        m.overview = result.overview
+        if isValid(m.overview)
+            m.boardEntries = m.overview.leaderboard
+            m.recap = m.overview.recap
+        end if
+    end if
+
+    render()
+end sub
+
+' ===== Views =====
+
+sub pushView(view as string)
+    m.stack.push({ view: m.view, index: m.rowList.itemFocused })
+    m.view = view
+    render()
+end sub
+
+function popView() as boolean
+    if m.stack.count() = 0 then return false
+
+    held = m.stack.pop()
+    m.view = held.view
+    render()
+    if held.index >= 0 and held.index < m.rows.count() then m.rowList.jumpToItem = held.index
+    return true
+end function
+
+sub render()
+    m.path.text = breadcrumb()
+
+    isOverview = m.view = "overview"
+    hasOverview = isValid(m.overview)
+
+    m.header.visible = isOverview and hasOverview and not m.loading
+    m.tabBar.visible = false
+    m.rowList.visible = false
+    m.message.visible = false
+    m.retryButton.visible = false
+    m.onRetry = false
+
+    if m.loading and not hasOverview
+        showMessage(tr("Loading..."))
+        return
+    end if
+
+    if not hasOverview
+        showMessage(tr("Could not load your achievements."))
+        m.retryButton.visible = true
+        m.onRetry = true
+        m.retryFocus.visible = true
+        m.retryButton.setFocus(true)
+        return
+    end if
+
+    if isOverview
+        drawRankHeader()
+        m.rows = overviewRows()
+    else if m.view = "badges"
+        showTabs(achievementsModel.BadgeFilters(), [tr("All"), tr("Unlocked"), tr("Locked")], m.badgeFilter)
+        m.rows = badgeRows()
+    else if m.view = "quests"
+        m.rows = questRows()
+    else if m.view = "leaderboard"
+        showTabs(boardIds(), boardLabels(), m.board)
+        m.rows = boardRows()
+    else if m.view = "recap"
+        showTabs(recapPeriods(), [tr("Week"), tr("Month"), tr("Year")], m.period)
+        drawRecapChips()
+        m.rows = recapRows()
+    else if m.view = "library"
+        m.rows = libraryRows()
+    end if
+
+    if m.loading and m.view <> "overview"
+        showMessage(tr("Loading..."))
+        return
+    end if
+
+    if m.rows.count() = 0
+        showMessage(tr("Nothing here yet."))
+        return
+    end if
+
+    commitRows()
+end sub
+
+function breadcrumb() as string
+    title = tr("Achievement Badges")
+    if m.view = "badges" then return `${title} / ${tr("Badges")}`
+    if m.view = "quests" then return `${title} / ${tr("Quests")}`
+    if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
+    if m.view = "recap" then return `${title} / ${tr("Recap")}`
+    if m.view = "library" then return `${title} / ${tr("Library completion")}`
+    return title
+end function
+
+sub showMessage(text as string)
+    m.message.text = text
+    m.message.visible = true
+end sub
+
+sub showTabs(ids as object, labels as object, activeId as string)
+    tabs = []
+    active = 0
+    index = 0
+    for each id in ids
+        tabs.push({ id: id, label: labels[index] })
+        if id = activeId then active = index
+        index++
+    end for
+
+    m.tabBar.tabs = tabs
+    m.tabBar.expanded = false
+    m.tabBar.focusIndex = active
+    m.tabBar.selectedIndex = active
+    m.tabBar.visible = true
+end sub
+
+' Every row in the panel is the same component, so a view only has to say what its rows carry
+sub commitRows()
+    content = CreateObject("roSGNode", "ContentNode")
+    height = 120
+    for each row in m.rows
+        if row.height > height then height = row.height
+    end for
+
+    for each row in m.rows
+        row.height = height
+        node = content.createChild("ContentNode")
+        node.addFields({ rowData: row })
+    end for
+
+    top = listTop()
+    ' Only as many rows as the panel has room for, so the list scrolls rather than running off
+    ' the bottom of the screen
+    rows = Int((1080 - top - ACHIEVEMENT_SECTION_GAP) / (height + 10))
+    if rows < 1 then rows = 1
+
+    m.rowList.itemSize = [ACHIEVEMENT_PANEL_WIDTH, height]
+    m.rowList.numRows = rows
+    m.rowList.translation = [ACHIEVEMENT_PANEL_X, top]
+    m.lastFocusIndex = 0
+    m.pendingFocusIndex = -1
+    m.rowList.content = content
+    m.rowList.visible = true
+    if not m.tabBar.isInFocusChain() then m.rowList.setFocus(true)
+end sub
+
+' The list starts under whatever the view drew above it
+function listTop() as integer
+    top = ACHIEVEMENT_PANEL_TOP
+    if m.tabBar.visible then top += ACHIEVEMENT_TAB_BAR_HEIGHT + ACHIEVEMENT_SECTION_GAP
+
+    if m.view = "overview" then return top + m.headerHeight + ACHIEVEMENT_SECTION_GAP
+    if m.view = "recap" then return top + m.chipsHeight + ACHIEVEMENT_SECTION_GAP
+    return top
+end function
+
+' ===== Header =====
+
+sub drawRankHeader()
+    y = 0
+    rank = m.overview.rank
+    m.rankRow.visible = isValid(rank)
+
+    if isValid(rank)
+        color = achievementsModel.ParseHexColor(rank.tier.color)
+        if color = "" then color = m.accent
+
+        m.rankFill.blendColor = themeChrome.WithAlpha(color, "2E")
+        m.rankBorder.blendColor = themeChrome.WithAlpha(color, "73")
+        m.rankIcon.uri = achievementsIcons.PathFor(rank.tier.icon)
+        m.rankIcon.blendColor = themeChrome.WithAlpha(color, "FF")
+        m.rankName.text = rank.tier.name
+        m.rankScore.text = substitute(tr("{0} points"), rank.score.toStr())
+        m.rankRow.translation = [0, y]
+        y += ACHIEVEMENT_RANK_AVATAR + ACHIEVEMENT_RANK_ROW_GAP
+
+        m.rankBarTrack.visible = true
+        m.rankBarTrack.translation = [0, y]
+        m.rankBarFill.width = ACHIEVEMENT_PANEL_WIDTH * achievementsModel.Clamp(rank.progressToNext / 100)
+        m.rankBarFill.color = color
+        y += ACHIEVEMENT_RANK_BAR_HEIGHT + ACHIEVEMENT_RANK_BAR_GAP
+
+        m.rankNote.visible = true
+        if isValid(rank.nextTier)
+            remaining = rank.nextTier.minScore - rank.score
+            if remaining < 0 then remaining = 0
+            m.rankNote.text = substitute(tr("{0} points to {1}"), remaining.toStr(), rank.nextTier.name)
+        else
+            m.rankNote.text = tr("Top rank reached")
+        end if
+        m.rankNote.translation = [0, y]
+        y += ACHIEVEMENT_RANK_NOTE_HEIGHT
+    else
+        m.rankBarTrack.visible = false
+        m.rankNote.visible = false
+    end if
+
+    if isValid(m.overview.summary)
+        if isValid(rank) then y += ACHIEVEMENT_CHIPS_GAP
+        m.chips.translation = [0, y]
+        y += drawChips(summaryChips())
+    end if
+
+    if m.overview.equipped.count() > 0
+        y += ACHIEVEMENT_SHOWCASE_GAP
+        m.showcase.translation = [0, y]
+        y += drawShowcase()
+    end if
+
+    m.headerHeight = y
+end sub
+
+function summaryChips() as object
+    summary = m.overview.summary
+    return [
+        { icon: "military_tech", label: substitute(tr("{0} of {1} badges"), summary.unlocked.toStr(), summary.total.toStr()) },
+        { icon: "percent", label: formatPercent(summary.percentage) },
+        { icon: "local_fire_department", label: substitute(tr("{0} day streak"), summary.currentWatchStreak.toStr()) },
+        { icon: "emoji_events", label: substitute(tr("Best: {0} days"), summary.bestWatchStreak.toStr()) }
+    ]
+end function
+
+sub drawRecapChips()
+    if not isValid(m.recap)
+        m.chips.removeChildrenIndex(m.chips.getChildCount(), 0)
+        m.chipsHeight = 0
+        m.header.visible = false
+        return
+    end if
+
+    m.header.visible = true
+    m.rankRow.visible = false
+    m.rankBarTrack.visible = false
+    m.rankNote.visible = false
+    m.showcase.visible = false
+    m.header.translation = [ACHIEVEMENT_PANEL_X, ACHIEVEMENT_PANEL_TOP + ACHIEVEMENT_TAB_BAR_HEIGHT + ACHIEVEMENT_SECTION_GAP]
+    m.chips.translation = [0, 0]
+
+    m.chipsHeight = drawChips([
+        { icon: "movie", label: `${m.recap.moviesWatched} ${tr("Movies")}` },
+        { icon: "live_tv", label: `${m.recap.episodesWatched} ${tr("Episodes")}` },
+        { icon: "calendar_month", label: substitute(tr("{0} days watched"), m.recap.daysWatched.toStr()) },
+        { icon: "military_tech", label: substitute(tr("{0} badges earned"), m.recap.badgesUnlocked.toStr()) }
+    ])
+end sub
+
+' Chips wrap once the row runs out of panel, the way they do on a page that is wider
+function drawChips(entries as object) as float
+    m.chips.removeChildrenIndex(m.chips.getChildCount(), 0)
+
+    x = 0
+    y = 0
+    for each entry in entries
+        chip = m.chips.createChild("Group")
+
+        fill = chip.createChild("Poster")
+        fill.uri = "pkg:/images/tracks/panel20.9.png"
+        fill.loadDisplayMode = "scaleToFit"
+        fill.blendColor = "#FFFFFF14"
+        fill.height = ACHIEVEMENT_CHIP_HEIGHT
+
+        icon = chip.createChild("Poster")
+        icon.uri = achievementsIcons.PathFor(entry.icon)
+        icon.width = ACHIEVEMENT_CHIP_ICON
+        icon.height = ACHIEVEMENT_CHIP_ICON
+        icon.blendColor = "#FFFFFFCC"
+        icon.translation = [ACHIEVEMENT_CHIP_ICON_INSET, (ACHIEVEMENT_CHIP_HEIGHT - ACHIEVEMENT_CHIP_ICON) / 2]
+
+        label = chip.createChild("Label")
+        label.font = m.chipFont.font
+        label.color = "#FFFFFFE6"
+        label.height = ACHIEVEMENT_CHIP_HEIGHT
+        label.vertAlign = "center"
+        label.translation = [ACHIEVEMENT_CHIP_ICON_INSET + ACHIEVEMENT_CHIP_ICON + ACHIEVEMENT_CHIP_ICON_GAP, 0]
+        label.text = entry.label
+
+        width = label.boundingRect().width + ACHIEVEMENT_CHIP_ICON_INSET + ACHIEVEMENT_CHIP_ICON + ACHIEVEMENT_CHIP_ICON_GAP + ACHIEVEMENT_CHIP_PAD
+        fill.width = width
+
+        if x > 0 and x + width > ACHIEVEMENT_PANEL_WIDTH
+            x = 0
+            y += ACHIEVEMENT_CHIP_HEIGHT + ACHIEVEMENT_CHIP_GAP
+        end if
+
+        chip.translation = [x, y]
+        x += width + ACHIEVEMENT_CHIP_GAP
+    end for
+
+    themeApply.ApplyToItem(m.chips)
+    return y + ACHIEVEMENT_CHIP_HEIGHT
+end function
+
+' The badges the viewer chose to show off, as many as the panel holds
+function drawShowcase() as float
+    m.showcase.removeChildrenIndex(m.showcase.getChildCount(), 0)
+    m.showcase.visible = true
+
+    perRow = Int(ACHIEVEMENT_PANEL_WIDTH / ACHIEVEMENT_SHOWCASE_ITEM)
+    x = 0
+    count = 0
+    for each badge in m.overview.equipped
+        if count >= perRow then exit for
+
+        color = achievementsModel.RarityColor(badge.rarity)
+        item = m.showcase.createChild("Group")
+        item.translation = [x, 0]
+
+        inset = (ACHIEVEMENT_SHOWCASE_ITEM - ACHIEVEMENT_SHOWCASE_AVATAR) / 2
+
+        fill = item.createChild("Poster")
+        fill.uri = "pkg:/images/tracks/panel20.9.png"
+        fill.loadDisplayMode = "scaleToFit"
+        fill.blendColor = themeChrome.WithAlpha(color, "2E")
+        fill.width = ACHIEVEMENT_SHOWCASE_AVATAR
+        fill.height = ACHIEVEMENT_SHOWCASE_AVATAR
+        fill.translation = [inset, 0]
+
+        border = item.createChild("Poster")
+        border.uri = "pkg:/images/tracks/panelborder20.9.png"
+        border.loadDisplayMode = "scaleToFit"
+        border.blendColor = themeChrome.WithAlpha(color, "73")
+        border.width = ACHIEVEMENT_SHOWCASE_AVATAR
+        border.height = ACHIEVEMENT_SHOWCASE_AVATAR
+        border.translation = [inset, 0]
+
+        icon = item.createChild("Poster")
+        icon.uri = achievementsIcons.PathFor(badge.icon)
+        icon.failedBitmapUri = "pkg:/images/achievements/emoji_events.png"
+        icon.width = ACHIEVEMENT_SHOWCASE_ICON
+        icon.height = ACHIEVEMENT_SHOWCASE_ICON
+        icon.blendColor = themeChrome.WithAlpha(color, "FF")
+        iconInset = (ACHIEVEMENT_SHOWCASE_AVATAR - ACHIEVEMENT_SHOWCASE_ICON) / 2
+        icon.translation = [inset + iconInset, iconInset]
+
+        title = item.createChild("Label")
+        title.font = m.chipFont.font
+        title.color = "#FFFFFFE6"
+        title.width = ACHIEVEMENT_SHOWCASE_ITEM
+        title.height = ACHIEVEMENT_SHOWCASE_TITLE_HEIGHT
+        title.horizAlign = "center"
+        title.wrap = true
+        title.maxLines = 2
+        title.translation = [0, ACHIEVEMENT_SHOWCASE_AVATAR + ACHIEVEMENT_SHOWCASE_TITLE_GAP]
+        title.text = badge.title
+
+        x += ACHIEVEMENT_SHOWCASE_ITEM
+        count++
+    end for
+
+    themeApply.ApplyToItem(m.showcase)
+    return ACHIEVEMENT_SHOWCASE_AVATAR + ACHIEVEMENT_SHOWCASE_TITLE_GAP + ACHIEVEMENT_SHOWCASE_TITLE_HEIGHT
+end function
+
+' ===== Rows =====
+
+function overviewRows() as object
+    rows = []
+    unlocked = 0
+    for each badge in m.overview.badges
+        if badge.unlocked then unlocked++
+    end for
+
+    rows.push(navRow("badges", tr("Badges"), substitute(tr("{0} of {1} badges"), unlocked.toStr(), m.overview.badges.count().toStr()), "military_tech", m.overview.badges.count() > 0))
+
+    if m.overview.questsEnabled and isValid(m.overview.quests) and not m.overview.quests.isEmpty
+        done = 0
+        for each quest in m.overview.quests.daily
+            if quest.completed then done++
+        end for
+        for each quest in m.overview.quests.weekly
+            if quest.completed then done++
+        end for
+        rows.push(navRow("quests", tr("Quests"), substitute(tr("{0} completed"), done.toStr()), "task_alt", true))
+    end if
+
+    if m.overview.leaderboardEnabled
+        rows.push(navRow("leaderboard", tr("Leaderboard"), tr("How you compare with other users on this server"), "leaderboard", true))
+    end if
+
+    rows.push(navRow("recap", tr("Recap"), tr("What you watched recently"), "insights", true))
+
+    libraries = m.overview.libraryCompletion.count()
+    if libraries > 0
+        rows.push(navRow("library", tr("Library completion"), substitute(tr("{0} libraries"), libraries.toStr()), "collections_bookmark", true))
+    end if
+
+    return rows
+end function
+
+function navRow(view as string, title as string, caption as string, icon as string, enabled as boolean) as object
+    return {
+        kind: "nav",
+        view: enabled ? view : "",
+        title: title,
+        caption: caption,
+        icon: icon,
+        tint: m.accent,
+        height: 120
+    }
+end function
+
+function badgeRows() as object
+    rows = []
+    groups = achievementsModel.GroupBadges(m.overview.badges, m.badgeFilter, tr("Other"))
+
+    for each group in groups
+        open = isValid(m.openCategories[group.category])
+        rows.push({
+            kind: "category",
+            category: group.category,
+            title: group.category,
+            caption: substitute(tr("{0} of {1} badges"), group.unlocked.toStr(), group.badges.count().toStr()),
+            icon: open ? "folder_open" : "folder",
+            tint: m.accent,
+            height: 120
+        })
+
+        if not open then continue for
+        for each badge in group.badges
+            rows.push(badgeRow(badge))
+        end for
+    end for
+
+    return rows
+end function
+
+function badgeRow(badge as object) as object
+    color = achievementsModel.RarityColor(badge.rarity)
+    showsProgress = not badge.unlocked and badge.targetValue > 0
+
+    row = {
+        kind: "badge",
+        title: badge.isSecret ? tr("Hidden achievement") : badge.title,
+        caption: "",
+        icon: badge.icon,
+        tint: color,
+        locked: not badge.unlocked,
+        trailingTop: badge.rarity,
+        trailingColor: color,
+        trailingBottom: substitute(tr("{0} pts"), badge.score.toStr()),
+        height: 150
+    }
+
+    if badge.description <> "" and not badge.descriptionHidden then row.caption = badge.description
+
+    if showsProgress
+        row.showBar = true
+        row.barValue = badge.progress
+        row.barColor = color
+        row.progressText = `${badge.currentValue} / ${badge.targetValue}`
+    else if badge.unlocked and isValid(badge.unlockedAt)
+        row.progressText = substitute(tr("Unlocked {0}"), mediumDate(badge.unlockedAt))
+    end if
+
+    return row
+end function
+
+function questRows() as object
+    rows = []
+    quests = m.overview.quests
+    if not isValid(quests) then return rows
+
+    if quests.daily.count() > 0
+        rows.push(headingRow(tr("Daily")))
+        for each quest in quests.daily
+            rows.push(questRow(quest))
+        end for
+    end if
+
+    if quests.weekly.count() > 0
+        rows.push(headingRow(tr("Weekly")))
+        for each quest in quests.weekly
+            rows.push(questRow(quest))
+        end for
+    end if
+
+    return rows
+end function
+
+function questRow(quest as object) as object
+    return {
+        kind: "quest",
+        title: quest.title,
+        caption: quest.description,
+        icon: quest.completed ? "check_circle" : quest.icon,
+        tint: m.accent,
+        showBar: true,
+        barValue: quest.progress,
+        barColor: m.accent,
+        progressText: `${quest.current} / ${quest.target}`,
+        trailingTop: substitute(tr("+{0}"), quest.reward.toStr()),
+        trailingColor: m.accent,
+        height: 160
+    }
+end function
+
+function headingRow(title as string) as object
+    return { kind: "heading", title: title, height: 70 }
+end function
+
+function recapPeriods() as object
+    return ["week", ACHIEVEMENTS_DEFAULT_PERIOD, "year"]
+end function
+
+function boardIds() as object
+    ' The plugin has no category name for the overall board, but a tab still needs an id of
+    ' its own
+    return ["score", "movies", "episodes", "hours", "streak", "series", "unlocked"]
+end function
+
+function boardLabels() as object
+    return [tr("Score"), tr("Movies"), tr("Episodes"), tr("Hours"), tr("Streak"), tr("Series"), tr("Badges")]
+end function
+
+function boardRows() as object
+    rows = []
+    place = 1
+    for each entry in m.boardEntries
+        caption = ""
+        if isValid(entry.customTitle)
+            caption = entry.customTitle
+        else if isValid(entry.unlocked)
+            total = isValid(entry.total) ? entry.total : 0
+            caption = substitute(tr("{0} of {1} badges"), entry.unlocked.toStr(), total.toStr())
+        end if
+
+        rows.push({
+            kind: "board",
+            gutter: place.toStr(),
+            title: entry.userName,
+            caption: caption,
+            trailingTop: achievementsModel.LeaderboardValue(entry).toStr(),
+            height: 120
+        })
+        place++
+    end for
+    return rows
+end function
+
+function recapRows() as object
+    rows = []
+    if not isValid(m.recap) then return rows
+
+    appendCounts(rows, tr("Genres"), m.recap.topGenres)
+    appendCounts(rows, tr("Top directors"), m.recap.topDirectors)
+    appendCounts(rows, tr("Top actors"), m.recap.topActors)
+    return rows
+end function
+
+sub appendCounts(rows as object, title as string, counts as object)
+    if counts.count() = 0 then return
+
+    rows.push(headingRow(title))
+    for each count in counts
+        rows.push({ kind: "count", title: count.name, trailingTop: count.count.toStr(), height: 100 })
+    end for
+end sub
+
+function libraryRows() as object
+    names = []
+    for each name in m.overview.libraryCompletion
+        names.push(name)
+    end for
+    names.sort()
+
+    rows = []
+    for each name in names
+        percent = m.overview.libraryCompletion[name]
+        rows.push({
+            kind: "library",
+            title: name,
+            showBar: true,
+            barValue: achievementsModel.Clamp(percent / 100),
+            barColor: m.accent,
+            trailingTop: `${percent}%`,
+            height: 130
+        })
+    end for
+    return rows
+end function
+
+' ===== Helpers =====
+
+' One decimal place, kept even on a round number so the figure does not change width
+function formatPercent(value as float) as string
+    tenths = Int(value * 10 + 0.5)
+    return `${Int(tenths / 10)}.${tenths mod 10}%`
+end function
+
+function mediumDate(date as object) as string
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    month = date.GetMonth()
+    if month < 1 or month > 12 then return ""
+    return `${months[month - 1]} ${date.GetDayOfMonth()}, ${date.GetYear()}`
+end function
+
+' ===== Input =====
+
+sub onTabActivated()
+    index = m.tabBar.activated
+    if index < 0 then return
+
+    if m.view = "badges"
+        filters = achievementsModel.BadgeFilters()
+        if index >= filters.count() then return
+        m.badgeFilter = filters[index]
+        render()
+        return
+    end if
+
+    if m.view = "leaderboard"
+        ids = boardIds()
+        if index >= ids.count() then return
+        m.board = ids[index]
+        ' The overall board came with the panel, so only a category costs a call
+        if m.board = boardIds()[0]
+            m.boardEntries = m.overview.leaderboard
+            render()
+        else
+            startLoad({ kind: "leaderboard", category: m.board })
+        end if
+        return
+    end if
+
+    if m.view = "recap"
+        periods = recapPeriods()
+        if index >= periods.count() then return
+        m.period = periods[index]
+        ' The month came with the panel, so only another period costs a call
+        if m.period = ACHIEVEMENTS_DEFAULT_PERIOD
+            m.recap = m.overview.recap
+            render()
+        else
+            startLoad({ kind: "recap", period: m.period })
+        end if
+    end if
+end sub
+
+sub onTabEscape()
+    if m.tabBar.escape = "down" and m.rowList.visible then m.rowList.setFocus(true)
+end sub
+
+' A heading names what follows rather than being a row of its own, so focus carries on the way
+' it was going rather than resting there
+sub onRowFocused()
+    focused = m.rowList.itemFocused
+    if focused < 0 or focused >= m.rows.count() then return
+
+    if m.rows[focused].kind <> "heading"
+        m.lastFocusIndex = focused
+        return
+    end if
+
+    direction = focused >= m.lastFocusIndex ? 1 : -1
+    target = focused + direction
+    while target >= 0 and target < m.rows.count() and m.rows[target].kind = "heading"
+        target += direction
+    end while
+
+    ' Nothing but headings that way, so focus goes back where it started
+    if target < 0 or target >= m.rows.count() then target = m.lastFocusIndex
+
+    m.pendingFocusIndex = target
+    m.skipHeadingTimer.control = "start"
+end sub
+
+sub onSkipHeadingTimer()
+    if m.pendingFocusIndex < 0 then return
+
+    target = m.pendingFocusIndex
+    m.pendingFocusIndex = -1
+    m.lastFocusIndex = target
+    m.rowList.jumpToItem = target
+end sub
+
+sub onRowSelected()
+    index = m.rowList.itemSelected
+    if index < 0 or index >= m.rows.count() then return
+
+    row = m.rows[index]
+    if row.kind = "nav"
+        if isValidAndNotEmpty(row.view) then pushView(row.view)
+        return
+    end if
+
+    if row.kind = "category"
+        ' A category opens onto its badges in place, the way a folder does
+        if isValid(m.openCategories[row.category])
+            m.openCategories.delete(row.category)
+        else
+            m.openCategories[row.category] = true
+        end if
+        render()
+        m.rowList.jumpToItem = index
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if m.onRetry
+        if key = KeyCode.OK
+            startLoad({ kind: "overview" })
+            return true
+        end if
+        if key = KeyCode.BACK
+            m.top.closed = true
+            return true
+        end if
+        return false
+    end if
+
+    if key = KeyCode.UP and m.rowList.isInFocusChain() and m.rowList.itemFocused = 0 and m.tabBar.visible
+        m.tabBar.setFocus(true)
+        return true
+    end if
+
+    if key = KeyCode.BACK
+        if popView() then return true
+        m.top.closed = true
+        return true
+    end if
+
+    return false
+end function

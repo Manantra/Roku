@@ -1,0 +1,21 @@
+import "pkg:/source/utils/misc.bs"
+
+' The plugin stores a Material Symbols name per badge, quest and rank tier, and an admin can
+' author a badge with any name at all. Every name the plugin ships has artwork under the folder
+' below, and a Poster falls back to the trophy the plugin's own web UI uses for anything else,
+' so nothing has to carry a list of what was drawn.
+
+const ACHIEVEMENT_ICON_FALLBACK = "pkg:/images/achievements/emoji_events.png"
+
+namespace achievementsIcons
+
+    function PathFor(name as dynamic) as string
+        if not isValidAndNotEmpty(name) then return ACHIEVEMENT_ICON_FALLBACK
+
+        key = LCase(name.trim())
+        if key = "" then return ACHIEVEMENT_ICON_FALLBACK
+
+        return `pkg:/images/achievements/${key}.png`
+    end function
+
+end namespace

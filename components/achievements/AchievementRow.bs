@@ -1,0 +1,195 @@
+import "pkg:/source/utils/achievementsIcons.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+import "pkg:/source/utils/themeChrome.bs"
+
+' One row of an achievements panel. Every screen in the panel draws rows from the same skeleton:
+' something on the left that names the row, a body that can carry a caption and a progress bar,
+' and figures on the right.
+
+const ACHIEVEMENT_ROW_WIDTH = 747
+const ACHIEVEMENT_ROW_PAD = 20
+const ACHIEVEMENT_AVATAR = 48
+const ACHIEVEMENT_GUTTER = 56
+const ACHIEVEMENT_BODY_X = 88
+const ACHIEVEMENT_TRAILING = 150
+
+sub init()
+    m.rowFill = m.top.findNode("rowFill")
+    m.rowFocus = m.top.findNode("rowFocus")
+    m.gutter = m.top.findNode("gutter")
+    m.avatar = m.top.findNode("avatar")
+    m.avatarFill = m.top.findNode("avatarFill")
+    m.avatarBorder = m.top.findNode("avatarBorder")
+    m.avatarIcon = m.top.findNode("avatarIcon")
+    m.rowTitle = m.top.findNode("rowTitle")
+    m.rowCaption = m.top.findNode("rowCaption")
+    m.barTrack = m.top.findNode("barTrack")
+    m.barFill = m.top.findNode("barFill")
+    m.progressText = m.top.findNode("progressText")
+    m.trailingTop = m.top.findNode("trailingTop")
+    m.trailingBottom = m.top.findNode("trailingBottom")
+
+    m.rowTitle.font.size = 26
+    m.rowCaption.font.size = 22
+    m.progressText.font.size = 20
+    m.trailingTop.font.size = 20
+    m.trailingBottom.font.size = 20
+    m.gutter.font.size = 28
+    m.restingFill = "#181818FF"
+    m.accent = themeChrome.Accent()
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onContentChanged()
+    content = m.top.itemContent
+    if not isValid(content) then return
+
+    data = content.rowData
+    if not isValid(data) then return
+
+    height = isValid(data.height) ? data.height : 120
+    m.rowFill.height = height
+    m.rowFocus.height = height
+
+    ' A heading names what follows rather than being a row of its own, so it goes without the
+    ' tile the rest of the list rests on. The list hands the same components back out as focus
+    ' moves, so a row that has just become a heading puts down what the last one was wearing.
+    m.isHeading = data.kind = "heading"
+    m.rowFill.visible = not m.isHeading
+    m.rowFill.blendColor = m.restingFill
+    if m.isHeading then m.rowFocus.visible = false
+
+    layoutLeading(data, height)
+    layoutBody(data, height)
+    layoutTrailing(data, height)
+
+    ' The row is filled in after the walk that themed what the markup declared, so the text it
+    ' just took on is offered to the theme too. A rarity keeps its own colour, since the walk
+    ' only remaps text that was neutral to begin with.
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub layoutLeading(data as object, height as float)
+    hasGutter = isValidAndNotEmpty(data.gutter)
+    m.gutter.visible = hasGutter
+    if hasGutter
+        m.gutter.text = data.gutter
+        m.gutter.height = height
+        m.gutter.vertAlign = "center"
+        m.gutter.translation = [ACHIEVEMENT_ROW_PAD, 0]
+    end if
+
+    hasIcon = isValidAndNotEmpty(data.icon)
+    m.avatar.visible = hasIcon
+    if not hasIcon then return
+
+    ' The fill and outline the settings rows wear, in whatever colour the badge carries. A
+    ' locked badge keeps the shape and loses the colour.
+    tint = isValidAndNotEmpty(data.tint) ? data.tint : m.accent
+    m.avatarFill.blendColor = themeChrome.WithAlpha(tint, "2E")
+    m.avatarBorder.blendColor = themeChrome.WithAlpha(tint, "73")
+    m.avatarIcon.uri = achievementsIcons.PathFor(data.icon)
+    m.avatarIcon.blendColor = themeChrome.WithAlpha(tint, "FF")
+    m.avatar.opacity = data.locked = true ? 0.45 : 1.0
+    m.avatar.translation = [ACHIEVEMENT_ROW_PAD, (height - ACHIEVEMENT_AVATAR) / 2]
+end sub
+
+sub layoutBody(data as object, height as float)
+    x = ACHIEVEMENT_BODY_X
+    if m.gutter.visible then x = ACHIEVEMENT_ROW_PAD + ACHIEVEMENT_GUTTER + 12
+    if not m.avatar.visible and not m.gutter.visible then x = ACHIEVEMENT_ROW_PAD
+
+    width = ACHIEVEMENT_ROW_WIDTH - x - ACHIEVEMENT_ROW_PAD
+    if isValidAndNotEmpty(data.trailingTop) or isValidAndNotEmpty(data.trailingBottom)
+        width -= ACHIEVEMENT_TRAILING
+    end if
+
+    hasCaption = isValidAndNotEmpty(data.caption)
+    hasBar = data.showBar = true
+    hasProgress = isValidAndNotEmpty(data.progressText)
+
+    stack = 34
+    if hasCaption then stack += 28
+    if hasBar then stack += 18
+    if hasProgress then stack += 26
+
+    y = (height - stack) / 2
+
+    m.rowTitle.text = isValid(data.title) ? data.title : ""
+    m.rowTitle.width = width
+    m.rowTitle.height = 34
+    m.rowTitle.translation = [x, y]
+    y += 34
+
+    m.rowCaption.visible = hasCaption
+    if hasCaption
+        m.rowCaption.text = data.caption
+        m.rowCaption.width = width
+        m.rowCaption.height = 28
+        m.rowCaption.translation = [x, y]
+        y += 28
+    end if
+
+    m.barTrack.visible = hasBar
+    if hasBar
+        m.barTrack.width = width
+        m.barTrack.translation = [x, y + 4]
+        m.barFill.width = width * data.barValue
+        m.barFill.color = isValidAndNotEmpty(data.barColor) ? data.barColor : m.accent
+        y += 18
+    end if
+
+    m.progressText.visible = hasProgress
+    if hasProgress
+        m.progressText.text = data.progressText
+        m.progressText.width = width
+        m.progressText.height = 26
+        m.progressText.translation = [x, y]
+    end if
+end sub
+
+sub layoutTrailing(data as object, height as float)
+    top = isValidAndNotEmpty(data.trailingTop)
+    bottom = isValidAndNotEmpty(data.trailingBottom)
+
+    x = ACHIEVEMENT_ROW_WIDTH - ACHIEVEMENT_ROW_PAD - ACHIEVEMENT_TRAILING
+    stack = 0
+    if top then stack += 26
+    if bottom then stack += 26
+    y = (height - stack) / 2
+
+    m.trailingTop.visible = top
+    if top
+        m.trailingTop.text = data.trailingTop
+        m.trailingTop.color = isValidAndNotEmpty(data.trailingColor) ? data.trailingColor : "#FFFFFF"
+        m.trailingTop.width = ACHIEVEMENT_TRAILING
+        m.trailingTop.height = 26
+        m.trailingTop.translation = [x, y]
+        y += 26
+    end if
+
+    m.trailingBottom.visible = bottom
+    if bottom
+        m.trailingBottom.text = data.trailingBottom
+        m.trailingBottom.width = ACHIEVEMENT_TRAILING
+        m.trailingBottom.height = 26
+        m.trailingBottom.translation = [x, y]
+    end if
+end sub
+
+' A focused row takes the same deepened fill and light text the settings rows take
+sub onFocusChanged()
+    if m.isHeading = true then return
+
+    focused = m.top.itemHasFocus
+    m.rowFocus.visible = focused
+
+    if focused
+        cursor = chainLookupReturn(m.global.session, "user.settings.colorCursor", "#00A4DCFF")
+        m.rowFill.blendColor = themeChrome.DeepenForLightInk(cursor)
+    else
+        m.rowFill.blendColor = m.restingFill
+    end if
+end sub

@@ -4,6 +4,7 @@ import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/PlaybackMethod.bs"
 import "pkg:/source/enums/SettingType.bs"
 import "pkg:/source/enums/String.bs"
+import "pkg:/source/api/Achievements.bs"
 import "pkg:/source/utils/buttonLayout.bs"
 import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/detailMetadataLayout.bs"
@@ -1686,6 +1687,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     ratings = findSettingsChildByTitle(pluginRootSection, "Metadata & Ratings")
     seerr = findSettingsChildByTitle(pluginRootSection, "Seerr")
     externalLists = findSettingsChildByTitle(pluginRootSection, "External Lists")
+    achievementBadges = findSettingsChildByTitle(pluginRootSection, "Achievement Badges")
 
     reordered = []
 
@@ -1731,12 +1733,13 @@ function reorderSettingsForFlutter(configTree as object) as object
 
     pushSettingIfValid(integrationsChildren, ratings)
     pushSettingIfValid(integrationsChildren, seerr)
+    pushSettingIfValid(integrationsChildren, achievementBadges)
     pushSettingIfValid(integrationsChildren, externalLists)
 
     if integrationsChildren.count() > 0
         reordered.push({
             title: "Integrations",
-            description: "Plugin, Seerr, and ratings integrations.",
+            description: "Plugin, Seerr, ratings, and achievement integrations.",
             icon: "integrations.png",
             children: integrationsChildren
         })
@@ -1776,7 +1779,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     moonfinMappedTitles = ["Navigation", "Home Screen", "Libraries", "Media Bar", "Theme Music", "Shuffle", "Support Moonfin", "Diagnostics", "Run Setup Again"]
     pushUnmappedChildrenByTitle(additionalChildren, moonfinSettings, moonfinMappedTitles)
 
-    pluginMappedTitles = ["Enable Plugin", "Settings Sync", "Metadata & Ratings", "Seerr", "External Lists"]
+    pluginMappedTitles = ["Enable Plugin", "Settings Sync", "Metadata & Ratings", "Seerr", "Achievement Badges", "External Lists"]
     pushUnmappedChildrenByTitle(additionalChildren, pluginRootSection, pluginMappedTitles)
 
     userInterfaceMappedTitles = ["General Style", "Libraries", "Details Screen"]
@@ -1841,6 +1844,9 @@ sub LoadMenu(configSection, appendPath = true as boolean)
                 end if
             end if
         end if
+
+        ' An entry that only exists where a server plugin answered
+        if isValid(item.requires) and not settingRequirementMet(item.requires) then continue for
 
         ' Add to visible items mapping
         m.visibleItemsMap.push(item)
@@ -1975,6 +1981,12 @@ sub settingSelected()
         ' A deliberate re-run asks every question again, answered or not
         wizard.rerun = true
         m.global.sceneManager.callFunc("pushScene", wizard)
+        return
+    end if
+
+    if isValid(selectedItem.settingName) and selectedItem.settingName = "achievements.open"
+        m.settingDesc.visible = false
+        showAchievementsPanel()
         return
     end if
 
@@ -2543,3 +2555,33 @@ sub onDiagnosticsReportSent(event as object)
         m.diagnosticsPanel.status = tr("Couldnt send the report.") + " (" + code.ToStr() + ")"
     end if
 end sub
+
+' The achievements panel sits over this one rather than replacing it, so leaving it lands back
+' on the entry it was opened from the way every other settings screen does
+sub showAchievementsPanel()
+    scene = m.top.getScene()
+    if not isValid(scene) then return
+
+    panel = CreateObject("roSGNode", "AchievementsScreen")
+    panel.id = "achievementsOverlayPanel"
+    panel.observeField("closed", "onAchievementsPanelClosed")
+    scene.appendChild(panel)
+    panel.callFunc("OnScreenShown", false)
+    panel.setFocus(true)
+end sub
+
+sub onAchievementsPanelClosed()
+    scene = m.top.getScene()
+    if isValid(scene)
+        panel = scene.findNode("achievementsOverlayPanel")
+        if isValid(panel) then scene.removeChild(panel)
+    end if
+
+    m.settingsMenu.setFocus(true)
+end sub
+
+' What a settings entry can ask the server for before it is worth showing
+function settingRequirementMet(requirement as string) as boolean
+    if requirement = "achievements" then return achievements.IsAvailable()
+    return true
+end function

@@ -1612,7 +1612,7 @@
   },
   {
     "title": "Moonfin Plugin",
-    "description": "Plugin connectivity, settings sync, ratings, and Seerr integration.",
+    "description": "Plugin connectivity, settings sync, ratings, Seerr, and Achievement Badges.",
     "children": [
       {
         "title": "Enable Plugin",
@@ -1725,6 +1725,13 @@
             "children": []
           }
         ]
+      },
+      {
+        "title": "Achievement Badges",
+        "description": "Badges, ranks and quests earned from what you watch",
+        "settingName": "achievements.open",
+        "icon": "military_tech.png",
+        "requires": "achievements"
       },
       {
         "title": "External Lists",

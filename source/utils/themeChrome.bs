@@ -124,8 +124,7 @@ namespace themeChrome
     end sub
 
     function RgbParts(colorString as string) as object
-        hex = colorString
-        if hex.left(2) = "0x" or hex.left(2) = "0X" then hex = hex.mid(2)
+        hex = themeChrome.BareHex(colorString)
         while hex.len() < 8
             hex = hex + "F"
         end while
@@ -134,6 +133,25 @@ namespace themeChrome
             g: val(hex.mid(2, 2), 16),
             b: val(hex.mid(4, 2), 16)
         }
+    end function
+
+    ' Colours reach here written both ways, as the six digits a plugin sends and as the eight a
+    ' theme setting holds, so the prefix goes and what is left is the digits
+    function BareHex(colorString as string) as string
+        hex = colorString.trim()
+        if hex.left(1) = "#" then hex = hex.mid(1)
+        if LCase(hex.left(2)) = "0x" then hex = hex.mid(2)
+        return hex
+    end function
+
+    ' The same colour at a chosen strength
+    function WithAlpha(colorString as string, alphaHex as string) as string
+        hex = themeChrome.BareHex(colorString)
+        while hex.len() < 6
+            hex = hex + "0"
+        end while
+
+        return "#" + hex.mid(0, 6) + alphaHex
     end function
 
     function IntParts(colorInt as dynamic) as dynamic
@@ -156,6 +174,42 @@ namespace themeChrome
         hi = int(value / 16)
         lo = value mod 16
         return digits.mid(hi, 1) + digits.mid(lo, 1)
+    end function
+
+    ' What a line of ordinary text needs against the surface behind it
+    const MIN_LIGHT_INK_CONTRAST = 4.5
+
+    function Channel(value as float) as float
+        v = value / 255.0
+        if v <= 0.03928 then return v / 12.92
+        return ((v + 0.055) / 1.055) ^ 2.4
+    end function
+
+    function Luminance(parts as object) as float
+        return 0.2126 * Channel(parts.r) + 0.7152 * Channel(parts.g) + 0.0722 * Channel(parts.b)
+    end function
+
+    function ContrastWithWhite(parts as object) as float
+        return 1.05 / (Luminance(parts) + 0.05)
+    end function
+
+    ' A colour taken down until light text reads against it, keeping its hue.
+    '
+    ' A theme names anything from near white to a saturated cyan for a focused fill. Dark text on
+    ' the bright ones measures well and still reads muddy across a room, so the fill is deepened
+    ' and keeps the light text the rows around it already use. Something dark enough comes back
+    ' as it is.
+    function DeepenForLightInk(colorString as string) as string
+        parts = themeChrome.RgbParts(colorString)
+
+        ' Fifteen percent a step reaches black from anywhere inside twenty, so this always ends
+        tries = 0
+        while tries < 20 and themeChrome.ContrastWithWhite(parts) < MIN_LIGHT_INK_CONTRAST
+            parts = { r: parts.r * 0.85, g: parts.g * 0.85, b: parts.b * 0.85 }
+            tries++
+        end while
+
+        return "#" + themeChrome.ByteToHex(Int(parts.r)) + themeChrome.ByteToHex(Int(parts.g)) + themeChrome.ByteToHex(Int(parts.b)) + "FF"
     end function
 
     ' Neutral text keeps its original brightness when it takes on the theme color.

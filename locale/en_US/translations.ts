@@ -5,8 +5,17 @@
 <context>
     <name>default</name>
     <message>
+        <source>+{0}</source>
+        <extracomment>The score a quest pays out</extracomment>
+        <translation>+{0}</translation>
+    </message>
+    <message>
         <source>192.168.1.100:8096 or https://example.com/jellyfin</source>
         <translation>192.168.1.100:8096 or https://example.com/jellyfin</translation>
+    </message>
+    <message>
+        <source>Achievement Badges</source>
+        <translation>Achievement Badges</translation>
     </message>
     <message>
         <source>Action Buttons</source>
@@ -33,8 +42,21 @@
         <translation>Back</translation>
     </message>
     <message>
+        <source>Badges</source>
+        <translation>Badges</translation>
+    </message>
+    <message>
+        <source>Badges, ranks and quests earned from what you watch</source>
+        <translation>Badges, ranks and quests earned from what you watch</translation>
+    </message>
+    <message>
         <source>Banner</source>
         <translation>Banner</translation>
+    </message>
+    <message>
+        <source>Best: {0} days</source>
+        <extracomment>The longest watch streak the viewer has reached</extracomment>
+        <translation>Best: {0} days</translation>
     </message>
     <message>
         <source>Bookshelf</source>
@@ -78,12 +100,20 @@
         <translation>Connect to Server</translation>
     </message>
     <message>
+        <source>Could not load your achievements.</source>
+        <translation>Could not load your achievements.</translation>
+    </message>
+    <message>
         <source>Crew</source>
         <translation>Crew</translation>
     </message>
     <message>
         <source>Custom themes</source>
         <translation>Custom themes</translation>
+    </message>
+    <message>
+        <source>Daily</source>
+        <translation>Daily</translation>
     </message>
     <message>
         <source>Direct Play</source>
@@ -137,6 +167,15 @@
         <translation>Go to Series</translation>
     </message>
     <message>
+        <source>Hours</source>
+        <translation>Hours</translation>
+    </message>
+    <message>
+        <source>Hidden achievement</source>
+        <extracomment>Stands in for a secret badge the viewer has not unlocked</extracomment>
+        <translation>Hidden achievement</translation>
+    </message>
+    <message>
         <source>How should a movie or show look when you open it?</source>
         <translation>How should a movie or show look when you open it?</translation>
     </message>
@@ -149,6 +188,10 @@
         <translation>How should your rows look?</translation>
     </message>
     <message>
+        <source>How you compare with other users on this server</source>
+        <translation>How you compare with other users on this server</translation>
+    </message>
+    <message>
         <source>Instant Mix</source>
         <translation>Instant Mix</translation>
     </message>
@@ -157,12 +200,24 @@
         <translation>Larger cards with titles underneath.</translation>
     </message>
     <message>
+        <source>Leaderboard</source>
+        <translation>Leaderboard</translation>
+    </message>
+    <message>
         <source>Left Sidebar</source>
         <translation>Left Sidebar</translation>
     </message>
     <message>
+        <source>Library completion</source>
+        <translation>Library completion</translation>
+    </message>
+    <message>
         <source>Loading...</source>
         <translation>Loading…</translation>
+    </message>
+    <message>
+        <source>Locked</source>
+        <translation>Locked</translation>
     </message>
     <message>
         <source>Login attempt failed.</source>
@@ -189,6 +244,10 @@
         <translation>Modern</translation>
     </message>
     <message>
+        <source>Month</source>
+        <translation>Month</translation>
+    </message>
+    <message>
         <source>Moonfin</source>
         <translation>Moonfin</translation>
     </message>
@@ -203,6 +262,10 @@
     <message>
         <source>No messages from your server yet</source>
         <translation>No messages from your server yet</translation>
+    </message>
+    <message>
+        <source>Nothing here yet.</source>
+        <translation>Nothing here yet.</translation>
     </message>
     <message>
         <source>Off</source>
@@ -221,6 +284,11 @@
         <translation>Options</translation>
     </message>
     <message>
+        <source>Other</source>
+        <extracomment>Groups badges an admin gave no category</extracomment>
+        <translation>Other</translation>
+    </message>
+    <message>
         <source>Pick a look</source>
         <translation>Pick a look</translation>
     </message>
@@ -235,6 +303,14 @@
     <message>
         <source>Please sign in</source>
         <translation>Please sign in</translation>
+    </message>
+    <message>
+        <source>Recap</source>
+        <translation>Recap</translation>
+    </message>
+    <message>
+        <source>Quests</source>
+        <translation>Quests</translation>
     </message>
     <message>
         <source>Recommendations</source>
@@ -263,6 +339,10 @@
     <message>
         <source>Save</source>
         <translation>Save</translation>
+    </message>
+    <message>
+        <source>Score</source>
+        <translation>Score</translation>
     </message>
     <message>
         <source>Search</source>
@@ -312,6 +392,10 @@
         <translation>Specials</translation>
     </message>
     <message>
+        <source>Streak</source>
+        <translation>Streak</translation>
+    </message>
+    <message>
         <source>Submit</source>
         <translation>Submit</translation>
     </message>
@@ -332,8 +416,20 @@
         <translation>There is more waiting in Settings</translation>
     </message>
     <message>
+        <source>Top actors</source>
+        <translation>Top actors</translation>
+    </message>
+    <message>
         <source>Top Bar</source>
         <translation>Top Bar</translation>
+    </message>
+    <message>
+        <source>Top directors</source>
+        <translation>Top directors</translation>
+    </message>
+    <message>
+        <source>Top rank reached</source>
+        <translation>Top rank reached</translation>
     </message>
     <message>
         <source>Trailer</source>
@@ -342,6 +438,15 @@
     <message>
         <source>Unknown Codec</source>
         <translation>Unknown Codec</translation>
+    </message>
+    <message>
+        <source>Unlocked {0}</source>
+        <extracomment>The date a badge was earned</extracomment>
+        <translation>Unlocked {0}</translation>
+    </message>
+    <message>
+        <source>Unlocked</source>
+        <translation>Unlocked</translation>
     </message>
     <message>
         <source>Unwatched</source>
@@ -646,8 +751,24 @@
         <extracomment>Current day</extracomment>
     </message>
     <message>
+        <source>Week</source>
+        <translation>Week</translation>
+    </message>
+    <message>
+        <source>Weekly</source>
+        <translation>Weekly</translation>
+    </message>
+    <message>
+        <source>What you watched recently</source>
+        <translation>What you watched recently</translation>
+    </message>
+    <message>
         <source>Where should navigation go?</source>
         <translation>Where should navigation go?</translation>
+    </message>
+    <message>
+        <source>Year</source>
+        <translation>Year</translation>
     </message>
     <message>
         <source>yesterday</source>
@@ -2700,6 +2821,48 @@
     <message>
         <source>Music Videos</source>
         <translation>Music Videos</translation>
+    </message>
+    <message>
+        <source>{0} badges earned</source>
+        <translation>{0} badges earned</translation>
+    </message>
+    <message>
+        <source>{0} days watched</source>
+        <translation>{0} days watched</translation>
+    </message>
+    <message>
+        <source>{0} pts</source>
+        <extracomment>What a badge is worth</extracomment>
+        <translation>{0} pts</translation>
+    </message>
+    <message>
+        <source>{0} libraries</source>
+        <translation>{0} libraries</translation>
+    </message>
+    <message>
+        <source>{0} completed</source>
+        <extracomment>How many quests are finished</extracomment>
+        <translation>{0} completed</translation>
+    </message>
+    <message>
+        <source>{0} day streak</source>
+        <extracomment>How many days running the viewer has watched something</extracomment>
+        <translation>{0} day streak</translation>
+    </message>
+    <message>
+        <source>{0} of {1} badges</source>
+        <extracomment>How many badges of a set are unlocked</extracomment>
+        <translation>{0} of {1} badges</translation>
+    </message>
+    <message>
+        <source>{0} points to {1}</source>
+        <extracomment>How far the viewer is from the next rank tier, where {1} is the tier name</extracomment>
+        <translation>{0} points to {1}</translation>
+    </message>
+    <message>
+        <source>{0} points</source>
+        <extracomment>The score a rank tier was reached with</extracomment>
+        <translation>{0} points</translation>
     </message>
     <message>
         <source>{0} favorites sorted by {1}</source>

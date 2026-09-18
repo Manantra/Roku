@@ -1,3 +1,4 @@
+import "pkg:/source/api/Achievements.bs"
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/api/MoonfinPlugin.bs"
 import "pkg:/source/api/userauth.bs"
@@ -216,6 +217,7 @@ namespace session
             session.user.LoadUserPreferences()
             HandleSeerrUserSwitch()
             session.user.CheckPluginStatus()
+            session.user.CheckAchievementsStatus()
             settingsSync.PullFromServer()
         end sub
 
@@ -272,6 +274,18 @@ namespace session
             tmpSession = m.global.session
             tmpSession.AddReplace("pluginInfo", pluginInfo)
             m.global.setFields({ session: tmpSession })
+        end sub
+
+        ' Achievement Badges is a plugin of its own, so it is asked separately. The login ping
+        ' is the one call it needs a client to make rather than read.
+        sub CheckAchievementsStatus()
+            info = achievements.Probe()
+
+            tmpSession = m.global.session
+            tmpSession.AddReplace("achievementsInfo", info)
+            m.global.setFields({ session: tmpSession })
+
+            if info.available then achievements.SendLoginPing()
         end sub
 
         ' Load and parse Display Settings from server

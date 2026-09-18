@@ -17,6 +17,7 @@ sub init()
     m.barHeight = 55
     m.tabPadX = 22
     m.barPad = 4
+    m.scrollX = 0
 
     m.tabFont = m.top.findNode("tabFont").font
     m.tabFont.size = fontApply.ThemeTextSize(23)
@@ -62,8 +63,20 @@ sub onTabsChanged()
         x += regionW
     end for
 
+    m.scrollX = 0
+    m.labelRow.translation = [0, 0]
+
     m.barBg.width = x + m.barPad
     m.barBg.height = m.barHeight + m.barPad * 2
+
+    ' A bar given a width it has to live inside keeps every tab and slides instead, so a set
+    ' too wide for the room is still all reachable
+    if m.top.maxWidth > 0 and m.barBg.width > m.top.maxWidth
+        m.barBg.width = m.top.maxWidth
+    end if
+    ' A clip of no size clips everything away rather than nothing, so the bar always names a
+    ' rectangle and simply makes it its own size when there is nothing to hold back
+    m.top.clippingRect = [0, 0, m.barBg.width, m.barBg.height]
 
     if m.top.focusIndex >= tabs.count() then m.top.focusIndex = 0
     updateHighlight()
@@ -75,35 +88,66 @@ end sub
 sub updateHighlight()
     hasFocus = m.top.isInFocusChain()
 
-    ' The bar still has to say which tab is open once focus has moved on to its content,
-    ' so the thumb stays on the open tab and only the ring goes
-    marked = hasFocus ? m.top.focusIndex : m.top.selectedIndex
+    ' The thumb says which tab is open and the ring says where the remote is. Where focus
+    ' follows selection the two sit on the same tab, and where it does not the bar has to show
+    ' both or there is nothing to say which tab the content below belongs to.
+    opened = m.top.selectedIndex
+    if opened < 0 or opened >= m.tabX.count()
+        opened = hasFocus ? m.top.focusIndex : -1
+    end if
+
+    if hasFocus then slideToTab(m.top.focusIndex)
 
     for i = 0 to m.labels.count() - 1
-        m.labels[i].color = i = marked ? "#FFFFFF" : "#FFFFFFBF"
+        lit = i = opened or (hasFocus and i = m.top.focusIndex)
+        m.labels[i].color = lit ? "#FFFFFF" : "#FFFFFFBF"
     end for
 
-    if marked >= 0 and marked < m.tabX.count()
-        moveFocusPill(marked)
-        m.focusRing.visible = hasFocus
+    if opened >= 0 and opened < m.tabX.count()
+        moveFocusPill(opened)
         m.focusPill.opacity = hasFocus ? 0.22 : 0.12
     else
         m.focusPill.visible = false
+    end if
+
+    if hasFocus and m.top.focusIndex >= 0 and m.top.focusIndex < m.tabX.count()
+        moveFocusRing(m.top.focusIndex)
+    else
         m.focusRing.visible = false
     end if
 
     themeApply.ApplyToItem(m.top)
 end sub
 
-sub moveFocusPill(index as integer)
-    targetX = m.tabX[index]
-    targetW = m.tabW[index]
+' The bar slides only far enough to keep the tab being walked to inside the room it has
+sub slideToTab(index as integer)
+    if m.top.maxWidth <= 0 then return
+    if index < 0 or index >= m.tabX.count() then return
 
-    m.focusRing.translation = [targetX, m.barPad]
-    m.focusRing.width = targetW
+    left = m.tabX[index] + m.scrollX
+    right = left + m.tabW[index]
+
+    if left < m.barPad
+        m.scrollX += m.barPad - left
+    else if right > m.top.maxWidth - m.barPad
+        m.scrollX -= right - (m.top.maxWidth - m.barPad)
+    end if
+
+    if m.scrollX > 0 then m.scrollX = 0
+    m.labelRow.translation = [m.scrollX, 0]
+end sub
+
+sub moveFocusRing(index as integer)
+    m.focusRing.translation = [m.tabX[index] + m.scrollX, m.barPad]
+    m.focusRing.width = m.tabW[index]
     m.focusRing.height = m.barHeight
     m.focusRing.blendColor = themeChrome.Token("inputBorderFocused", "#FFFFFF")
     m.focusRing.visible = true
+end sub
+
+sub moveFocusPill(index as integer)
+    targetX = m.tabX[index] + m.scrollX
+    targetW = m.tabW[index]
 
     if not m.focusPill.visible
         m.focusPill.translation = [targetX, m.barPad]

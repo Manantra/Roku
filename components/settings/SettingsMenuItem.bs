@@ -1,6 +1,7 @@
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/SettingType.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeChrome.bs"
 
 ' A heading rests on the bottom of its row so it reads as belonging to what
 ' follows rather than floating between the two
@@ -117,11 +118,13 @@ sub focusChanged()
         startMarquee(m.settingTitle)
         startMarquee(m.settingCurrentValue)
         startMarquee(m.settingDescription)
-        m.buttonBackground.blendColor = focusColor
+        ' The fill is taken down far enough to carry the same light text the rows around it
+        ' use, since dark text on a bright fill measures well and still reads muddy across a room
+        m.buttonBackground.blendColor = themeChrome.DeepenForLightInk(focusColor)
         m.focusOutline.visible = m.top.drawFocusFeedback
-        m.settingTitle.color = "#000000FF"
-        m.settingCurrentValue.color = "#000000FF"
-        m.settingDescription.color = "#000000FF"
+        m.settingTitle.color = "#FFFFFFF5"
+        m.settingCurrentValue.color = "#FFFFFFC7"
+        m.settingDescription.color = "#FFFFFFC7"
     else
         stopMarquee(m.settingTitle)
         stopMarquee(m.settingCurrentValue)

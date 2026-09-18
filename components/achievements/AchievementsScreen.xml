@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AchievementsScreen" extends="JFScreen">
+    <interface>
+        <!-- Raised when the last view is left, so whoever opened the panel takes it away -->
+        <field id="closed" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <!-- The panel the settings screens use, so an entry opened from settings keeps the
+            place it was opened from in view -->
+        <Rectangle width="1920" height="1080" color="#000000" opacity="0.70" />
+        <Rectangle translation="[1120, 0]" width="800" height="1080" color="#101010" />
+
+        <ScrollingText id="path" translation="[1146, 22]" font="font:SmallBoldSystemFont" maxWidth="747" />
+
+        <Group id="header" translation="[1146, 80]" visible="false">
+            <Group id="rankRow" visible="false">
+                <Poster id="rankFill" uri="pkg:/images/tracks/panel20.9.png"
+                    loadDisplayMode="scaleToFit" width="88" height="88" />
+                <Poster id="rankBorder" uri="pkg:/images/tracks/panelborder20.9.png"
+                    loadDisplayMode="scaleToFit" width="88" height="88" />
+                <Poster id="rankIcon" width="48" height="48" translation="[20, 20]"
+                    failedBitmapUri="pkg:/images/achievements/emoji_events.png" />
+                <Label id="rankName" translation="[108, 12]" width="620" height="40"
+                    font="font:LargeBoldSystemFont" color="#FFFFFF" />
+                <Label id="rankScore" translation="[108, 54]" width="620" height="30"
+                    font="font:SmallSystemFont" color="#FFFFFFB3" />
+            </Group>
+
+            <Rectangle id="rankBarTrack" height="10" width="747" color="#FFFFFF" opacity="0.16" visible="false">
+                <Rectangle id="rankBarFill" height="10" color="#00A4DC" />
+            </Rectangle>
+            <Label id="rankNote" width="747" height="30" font="font:SmallSystemFont"
+                color="#FFFFFFB3" visible="false" />
+
+            <Group id="chips" />
+            <!-- Never shown, it lends its font to the chips built at runtime -->
+            <Label id="chipFont" font="font:SmallSystemFont" visible="false" />
+
+            <Group id="showcase" visible="false" />
+        </Group>
+
+        <DetailTabBar id="tabBar" translation="[1146, 80]" visible="false" />
+
+        <MarkupList
+            id="rowList"
+            translation="[1146, 200]"
+            itemComponentName="AchievementRow"
+            itemSize="[747, 120]"
+            itemSpacing="[0, 10]"
+            numRows="7"
+            vertFocusAnimationStyle="floatingFocus"
+            drawFocusFeedback="false"
+            visible="false" />
+
+        <Label id="message" translation="[1146, 300]" width="747" height="120" wrap="true"
+            font="font:MediumSystemFont" color="#FFFFFFB3" visible="false" />
+
+        <Group id="retryButton" translation="[1146, 420]" visible="false">
+            <Poster id="retryFill" uri="pkg:/images/details/surface17.9.png"
+                loadDisplayMode="scaleToFit" width="220" height="64" blendColor="#FFFFFF14" />
+            <Poster id="retryFocus" uri="pkg:/images/details/cardborderfocus.9.png"
+                loadDisplayMode="scaleToFit" width="220" height="64" blendColor="#FFFFFF" visible="false" />
+            <Label id="retryLabel" width="220" height="64" horizAlign="center" vertAlign="center"
+                font="font:MediumBoldSystemFont" color="#FFFFFF" />
+        </Group>
+
+        <!-- A heading is not a stop, so focus is moved past it a frame after it lands there -->
+        <Timer id="skipHeadingTimer" duration="0.01" repeat="false" />
+        <AchievementsTask id="loadTask" />
+    </children>
+</component>

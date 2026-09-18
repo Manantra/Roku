@@ -1,0 +1,127 @@
+import "pkg:/source/api/baserequest.bs"
+import "pkg:/source/utils/achievementsModel.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Client for the Achievement Badges plugin, which is a server plugin of its own, so it lives
+' under /Plugins/AchievementBadges and is probed separately.
+'
+' Nothing here throws. A server without the plugin answers 404 on every route, and a panel that
+' asked for everything at once and got nothing back wants an empty screen rather than a pile of
+' errors, so a failed call reads as no answer. Nothing here polls.
+
+const ACHIEVEMENTS_ROOT = "/Plugins/AchievementBadges"
+' What the panel opens on, so the screen that can change it knows what it was handed
+const ACHIEVEMENTS_DEFAULT_PERIOD = "month"
+
+namespace achievements
+
+    function Request(path as string, params = {} as object) as dynamic
+        req = APIRequest(`${ACHIEVEMENTS_ROOT}/${path}`, params)
+        if not isValid(req) then return invalid
+
+        return getJson(req)
+    end function
+
+    function GetMap(path as string, params = {} as object) as dynamic
+        data = Request(path, params)
+        return achievementsModel.IsObject(data) ? data : invalid
+    end function
+
+    function GetList(path as string, params = {} as object) as object
+        data = Request(path, params)
+        if not isValidAndNotEmpty(data) then return []
+        if LCase(type(data)) <> "roarray" then return []
+        return data
+    end function
+
+    ' What the admin left switched on, as the last probe found it. Both stay on until the server
+    ' says otherwise, since a plugin too old to report them still serves them.
+    function Flags() as object
+        info = chainLookupReturn(m.global, "session.achievementsInfo", invalid)
+        if not isValid(info) then return { available: false, leaderboardEnabled: true, questsEnabled: true }
+        return info
+    end function
+
+    function IsAvailable() as boolean
+        return Flags().available = true
+    end function
+
+    ' Whether the plugin answered here. public-config needs no administrator, so an ordinary
+    ' user gets the same answer, and a server without the plugin has no such route.
+    function Probe() as object
+        config = GetMap("public-config")
+        if not isValid(config)
+            return { available: false, leaderboardEnabled: true, questsEnabled: true }
+        end if
+
+        return {
+            available: true,
+            leaderboardEnabled: achievementsModel.Field(config, "LeaderboardEnabled") <> false,
+            questsEnabled: achievementsModel.Field(config, "QuestsEnabled") <> false
+        }
+    end function
+
+    ' The one thing the plugin needs a client to drive, since it is what keeps a daily login
+    ' streak alive. Nothing waits on it and nothing reads the answer.
+    sub SendLoginPing()
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return
+
+        req = APIRequest(`${ACHIEVEMENTS_ROOT}/users/${userId}/login-ping`)
+        if not isValid(req) then return
+
+        req.SetRequest("POST")
+        postJson(req, "")
+    end sub
+
+    function FetchLeaderboard(category = "" as string, limit = 10 as integer) as object
+        if not Flags().leaderboardEnabled then return []
+
+        path = "leaderboard"
+        if category <> "" then path = `leaderboard/${category}`
+        return achievementsModel.ParseLeaderboard(GetList(path, { limit: limit }))
+    end function
+
+    function FetchRecap(period as string) as dynamic
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return invalid
+
+        return achievementsModel.ParseRecap(GetMap(`users/${userId}/recap`, { period: period }))
+    end function
+
+    ' Everything the panel opens with. A section the admin switched off is not requested at all
+    ' rather than fetched and thrown away.
+    function LoadOverview() as dynamic
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return invalid
+
+        config = Flags()
+        summary = GetMap(`users/${userId}/summary`)
+        rank = GetMap(`users/${userId}/rank`)
+        badges = achievementsModel.ParseBadges(GetList(`users/${userId}`))
+
+        ' A server that answered none of it has lost the plugin, rather than holding an empty
+        ' profile
+        if not isValid(summary) and badges.count() = 0 and not isValid(rank) then return invalid
+
+        quests = invalid
+        if config.questsEnabled then quests = achievementsModel.ParseQuests(GetMap(`users/${userId}/quests`))
+
+        leaderboard = []
+        if config.leaderboardEnabled then leaderboard = FetchLeaderboard()
+
+        return {
+            summary: achievementsModel.ParseSummary(summary),
+            rank: achievementsModel.ParseRank(rank),
+            badges: badges,
+            equipped: achievementsModel.ParseBadges(GetList(`users/${userId}/equipped`)),
+            quests: quests,
+            leaderboard: leaderboard,
+            recap: achievementsModel.ParseRecap(GetMap(`users/${userId}/recap`, { period: ACHIEVEMENTS_DEFAULT_PERIOD })),
+            libraryCompletion: achievementsModel.ParseLibraryCompletion(GetMap(`users/${userId}/library-completion`)),
+            leaderboardEnabled: config.leaderboardEnabled,
+            questsEnabled: config.questsEnabled
+        }
+    end function
+
+end namespace

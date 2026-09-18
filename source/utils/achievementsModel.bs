@@ -1,0 +1,348 @@
+import "pkg:/source/utils/misc.bs"
+
+' Shapes for the Achievement Badges plugin.
+'
+' The plugin writes PascalCase names and leaves a null property out of the payload rather than
+' writing it, so anything it can omit has to be read as missing rather than as a value. Admins
+' author badges with any category, rarity or icon they like, which is why none of those are a
+' fixed set.
+
+namespace achievementsModel
+
+    function IsObject(value as dynamic) as boolean
+        if not isValid(value) then return false
+        return LCase(type(value)) = "roassociativearray"
+    end function
+
+    function Field(json as object, name as string) as dynamic
+        if not IsObject(json) then return invalid
+        return json.LookupCI(name)
+    end function
+
+    function AsInt(value as dynamic) as integer
+        if not isValid(value) then return 0
+
+        kind = LCase(type(value))
+        if kind = "rointeger" or kind = "integer" then return value
+        if kind = "rofloat" or kind = "float" or kind = "rodouble" or kind = "double" then return Int(value + 0.5)
+        if kind = "rolonginteger" or kind = "longinteger" then return Int(value)
+        if kind = "rostring" or kind = "string" then return Int(val(value))
+        return 0
+    end function
+
+    function AsNumber(value as dynamic) as float
+        if not isValid(value) then return 0.0
+
+        kind = LCase(type(value))
+        if kind = "rostring" or kind = "string" then return val(value)
+        if kind = "roboolean" or kind = "boolean" then return 0.0
+        return value
+    end function
+
+    function AsString(value as dynamic) as string
+        if not isValid(value) then return ""
+        kind = LCase(type(value))
+        if kind <> "rostring" and kind <> "string" then return ""
+        return value
+    end function
+
+    function AsBool(value as dynamic) as boolean
+        return value = true
+    end function
+
+    ' A badge with a timestamp the server wrote oddly should still draw, so an unreadable date
+    ' reads as nothing rather than stopping the row
+    function AsDate(value as dynamic) as dynamic
+        text = AsString(value)
+        if text = "" then return invalid
+
+        date = CreateObject("roDateTime")
+        date.FromISO8601String(text)
+        if date.AsSeconds() = 0 then return invalid
+        return date
+    end function
+
+    ' Points a badge is worth. The plugin works this out from rarity rather than storing it per
+    ' badge, so the table has to be repeated here.
+    function ScoreForRarity(rarity as dynamic) as integer
+        name = LCase(AsString(rarity).trim())
+        if name = "uncommon" then return 20
+        if name = "rare" then return 35
+        if name = "epic" then return 60
+        if name = "legendary" then return 100
+        if name = "mythic" then return 150
+        return 10
+    end function
+
+    ' Rarity arrives as free text, so anything unrecognised reads as common.
+    function RarityColor(rarity as dynamic) as string
+        name = LCase(AsString(rarity).trim())
+        if name = "uncommon" then return "#4CAF50"
+        if name = "rare" then return "#2196F3"
+        if name = "epic" then return "#9C27B0"
+        if name = "legendary" then return "#FF9800"
+        if name = "mythic" then return "#E91E63"
+        return "#9AA5B1"
+    end function
+
+    ' The rank tier carries its own colour as the plugin wrote it. Six hex digits or the caller
+    ' keeps whatever it was going to use instead.
+    function ParseHexColor(value as dynamic) as string
+        hex = AsString(value).trim()
+        if hex.left(1) = "#" then hex = hex.mid(1)
+        if hex.len() <> 6 then return ""
+
+        for i = 0 to 5
+            piece = LCase(hex.mid(i, 1))
+            isDigit = piece >= "0" and piece <= "9"
+            isHex = piece >= "a" and piece <= "f"
+            if not isDigit and not isHex then return ""
+        end for
+
+        return "#" + hex
+    end function
+
+    function Clamp(value as float) as float
+        if value > 1 then return 1.0
+        if value < 0 then return 0.0
+        return value
+    end function
+
+    function Ratio(current as integer, target as integer) as float
+        if target <= 0 then return 0.0
+        return Clamp(current / target)
+    end function
+
+    function ParseSummary(json as object) as dynamic
+        if not IsObject(json) then return invalid
+
+        return {
+            unlocked: AsInt(Field(json, "Unlocked")),
+            total: AsInt(Field(json, "Total")),
+            percentage: AsNumber(Field(json, "Percentage")),
+            score: AsInt(Field(json, "Score")),
+            currentWatchStreak: AsInt(Field(json, "CurrentWatchStreak")),
+            bestWatchStreak: AsInt(Field(json, "BestWatchStreak"))
+        }
+    end function
+
+    function ParseTier(json as object) as object
+        return {
+            name: AsString(Field(json, "Name")),
+            minScore: AsInt(Field(json, "MinScore")),
+            color: AsString(Field(json, "Color")),
+            icon: AsString(Field(json, "Icon"))
+        }
+    end function
+
+    function ParseRank(json as object) as dynamic
+        if not IsObject(json) then return invalid
+
+        upcoming = Field(json, "NextTier")
+        return {
+            score: AsInt(Field(json, "Score")),
+            ' A missing tier still has to draw, so it falls back to an empty one rather than nothing
+            tier: ParseTier(Field(json, "Tier")),
+            ' Left out of the payload once the user reaches the top tier
+            nextTier: IsObject(upcoming) ? ParseTier(upcoming) : invalid,
+            progressToNext: AsInt(Field(json, "ProgressToNext"))
+        }
+    end function
+
+    function ParseBadge(json as object) as object
+        unlocked = AsBool(Field(json, "Unlocked"))
+        title = AsString(Field(json, "Title"))
+        description = AsString(Field(json, "Description"))
+        currentValue = AsInt(Field(json, "CurrentValue"))
+        targetValue = AsInt(Field(json, "TargetValue"))
+        rarity = AsString(Field(json, "Rarity"))
+
+        return {
+            id: AsString(Field(json, "Id")),
+            title: title,
+            description: description,
+            icon: AsString(Field(json, "Icon")),
+            category: AsString(Field(json, "Category")),
+            rarity: rarity,
+            unlocked: unlocked,
+            unlockedAt: AsDate(Field(json, "UnlockedAt")),
+            currentValue: currentValue,
+            targetValue: targetValue,
+            ' The plugin never sends a secret flag. It masks a locked secret badge's title
+            ' instead, and that mask is all a client gets to go on.
+            isSecret: not unlocked and title.trim() = "???",
+            descriptionHidden: not unlocked and description.trim() = "???",
+            score: ScoreForRarity(rarity),
+            progress: unlocked ? 1.0 : Ratio(currentValue, targetValue)
+        }
+    end function
+
+    function ParseBadges(list as dynamic) as object
+        badges = []
+        if not isValidAndNotEmpty(list) then return badges
+
+        for each entry in list
+            if IsObject(entry) then badges.push(ParseBadge(entry))
+        end for
+        return badges
+    end function
+
+    function ParseQuest(json as object) as object
+        completed = AsBool(Field(json, "Completed"))
+        current = AsInt(Field(json, "Current"))
+        target = AsInt(Field(json, "Target"))
+
+        return {
+            id: AsString(Field(json, "Id")),
+            title: AsString(Field(json, "Title")),
+            description: AsString(Field(json, "Description")),
+            icon: AsString(Field(json, "Icon")),
+            reward: AsInt(Field(json, "Reward")),
+            target: target,
+            current: current,
+            completed: completed,
+            progress: completed ? 1.0 : Ratio(current, target)
+        }
+    end function
+
+    function QuestList(value as dynamic) as object
+        quests = []
+        if not isValidAndNotEmpty(value) then return quests
+
+        for each entry in value
+            if IsObject(entry) then quests.push(ParseQuest(entry))
+        end for
+        return quests
+    end function
+
+    function ParseQuests(json as object) as dynamic
+        if not IsObject(json) then return invalid
+
+        daily = QuestList(Field(json, "Daily"))
+        weekly = QuestList(Field(json, "Weekly"))
+        return { daily: daily, weekly: weekly, isEmpty: daily.count() = 0 and weekly.count() = 0 }
+    end function
+
+    ' The overall board carries a score and a completion count. A category board carries one
+    ' value that means whatever the category is and leaves the rest out, so what is present
+    ' decides which board this row came from.
+    function ParseLeaderboardEntry(json as object) as object
+        customTitle = AsString(Field(json, "CustomTitle"))
+
+        return {
+            userId: AsString(Field(json, "UserId")),
+            userName: AsString(Field(json, "UserName")),
+            score: json.DoesExist("Score") ? AsInt(Field(json, "Score")) : invalid,
+            unlocked: json.DoesExist("Unlocked") ? AsInt(Field(json, "Unlocked")) : invalid,
+            total: json.DoesExist("Total") ? AsInt(Field(json, "Total")) : invalid,
+            value: json.DoesExist("Value") ? AsInt(Field(json, "Value")) : invalid,
+            customTitle: customTitle <> "" ? customTitle : invalid
+        }
+    end function
+
+    function ParseLeaderboard(list as dynamic) as object
+        rows = []
+        if not isValidAndNotEmpty(list) then return rows
+
+        for each entry in list
+            if IsObject(entry) then rows.push(ParseLeaderboardEntry(entry))
+        end for
+        return rows
+    end function
+
+    function LeaderboardValue(entry as object) as integer
+        if isValid(entry.value) then return entry.value
+        if isValid(entry.score) then return entry.score
+        return 0
+    end function
+
+    function CountList(value as dynamic) as object
+        counts = []
+        if not isValidAndNotEmpty(value) then return counts
+
+        for each entry in value
+            if IsObject(entry)
+                counts.push({ name: AsString(Field(entry, "Name")), count: AsInt(Field(entry, "Count")) })
+            end if
+        end for
+        return counts
+    end function
+
+    function ParseRecap(json as object) as dynamic
+        if not IsObject(json) then return invalid
+
+        return {
+            period: AsString(Field(json, "Period")),
+            moviesWatched: AsInt(Field(json, "MoviesWatched")),
+            episodesWatched: AsInt(Field(json, "EpisodesWatched")),
+            daysWatched: AsInt(Field(json, "DaysWatched")),
+            badgesUnlocked: AsInt(Field(json, "BadgesUnlocked")),
+            topGenres: CountList(Field(json, "TopGenres")),
+            topDirectors: CountList(Field(json, "TopDirectors")),
+            topActors: CountList(Field(json, "TopActors"))
+        }
+    end function
+
+    function ParseLibraryCompletion(json as object) as object
+        percents = Field(json, "LibraryCompletionPercents")
+        out = {}
+        if not IsObject(percents) then return out
+
+        for each key in percents
+            value = percents[key]
+            kind = LCase(type(value))
+            if kind <> "roboolean" and kind <> "boolean" and kind <> "rostring" and kind <> "string"
+                out[key] = AsInt(value)
+            end if
+        end for
+        return out
+    end function
+
+    ' ===== Badges screen =====
+
+    function BadgeFilters() as object
+        return ["all", "unlocked", "locked"]
+    end function
+
+    function FilterBadges(badges as object, filter as string) as object
+        if filter <> "unlocked" and filter <> "locked" then return badges
+
+        kept = []
+        wantUnlocked = filter = "unlocked"
+        for each badge in badges
+            if badge.unlocked = wantUnlocked then kept.push(badge)
+        end for
+        return kept
+    end function
+
+    ' Filtering happens before grouping, so a category the filter emptied leaves the list rather
+    ' than sitting there with nothing under it. Badges keep the order the server sent them in.
+    function GroupBadges(badges as object, filter as string, otherLabel as string) as object
+        names = []
+        grouped = {}
+
+        for each badge in FilterBadges(badges, filter)
+            category = badge.category
+            if category = "" then category = otherLabel
+            if not isValid(grouped[category])
+                grouped[category] = []
+                names.push(category)
+            end if
+            grouped[category].push(badge)
+        end for
+
+        names.sort()
+
+        groups = []
+        for each category in names
+            members = grouped[category]
+            unlocked = 0
+            for each badge in members
+                if badge.unlocked then unlocked++
+            end for
+            groups.push({ category: category, badges: members, unlocked: unlocked })
+        end for
+        return groups
+    end function
+
+end namespace

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AchievementRow" extends="Group">
+    <children>
+        <Poster id="rowFill" uri="pkg:/images/hd_focus_filled.9.png" width="747" />
+        <Poster id="rowFocus" uri="pkg:/images/hd_focus.9.png" width="747" visible="false" />
+
+        <!-- A leaderboard row counts its place rather than carrying artwork -->
+        <Label id="gutter" width="56" horizAlign="center" font="font:MediumBoldSystemFont"
+            color="#FFFFFF" visible="false" />
+
+        <Group id="avatar" visible="false">
+            <Poster id="avatarFill" uri="pkg:/images/details/surface12.9.png"
+                loadDisplayMode="scaleToFit" width="48" height="48" />
+            <Poster id="avatarBorder" uri="pkg:/images/details/cardborder12.9.png"
+                loadDisplayMode="scaleToFit" width="48" height="48" />
+            <Poster id="avatarIcon" width="24" height="24" translation="[12, 12]"
+                failedBitmapUri="pkg:/images/achievements/emoji_events.png" />
+        </Group>
+
+        <Label id="rowTitle" font="font:SmallBoldSystemFont" color="#FFFFFF" />
+        <Label id="rowCaption" font="font:SmallestSystemFont" color="#FFFFFFA6" />
+
+        <Rectangle id="barTrack" height="8" color="#FFFFFF" opacity="0.16" visible="false">
+            <Rectangle id="barFill" height="8" color="#00A4DC" />
+        </Rectangle>
+        <Label id="progressText" font="font:SmallestSystemFont" color="#FFFFFFB3" visible="false" />
+
+        <!-- Rarity over points on a badge, the reward on a quest, one figure on a board -->
+        <Label id="trailingTop" horizAlign="right" font="font:SmallestSystemFont" visible="false" />
+        <Label id="trailingBottom" horizAlign="right" font="font:SmallestSystemFont"
+            color="#FFFFFFB3" visible="false" />
+    </children>
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChanged" />
+        <field id="itemHasFocus" type="boolean" onChange="onFocusChanged" />
+        <field id="drawFocusFeedback" type="boolean" value="false" />
+    </interface>
+</component>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="AchievementsTask" extends="Task">
+    <interface>
+        <!-- overview, leaderboard or recap -->
+        <field id="request" type="assocarray" />
+        <field id="result" type="assocarray" alwaysNotify="true" />
+    </interface>
+</component>
