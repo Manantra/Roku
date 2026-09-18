@@ -1,0 +1,37 @@
+import "pkg:/source/utils/misc.bs"
+
+' The node type the app uses for each kind of Jellyfin item, so a screen that knows only what the
+' server called something can still hand the rest of the app a node it recognises.
+
+namespace contentNodes
+
+    function ForType(itemType as string) as object
+        if isStringEqual(itemType, "Movie") or isStringEqual(itemType, "MusicVideo") then return CreateObject("roSGNode", "MovieData")
+        if isStringEqual(itemType, "Series") then return CreateObject("roSGNode", "SeriesData")
+        if isStringEqual(itemType, "BoxSet") then return CreateObject("roSGNode", "CollectionData")
+        if isStringEqual(itemType, "Person") then return CreateObject("roSGNode", "PersonData")
+        if isStringEqual(itemType, "MusicArtist") then return CreateObject("roSGNode", "MusicArtistData")
+
+        ' These node types do not take their type from the json they are given, so it is set here
+        if isStringEqual(itemType, "Episode")
+            node = CreateObject("roSGNode", "TVEpisode")
+            node.type = "Episode"
+            return node
+        end if
+
+        if isStringEqual(itemType, "MusicAlbum")
+            node = CreateObject("roSGNode", "MusicAlbumData")
+            node.type = "MusicAlbum"
+            return node
+        end if
+
+        if isStringEqual(itemType, "Audio")
+            node = CreateObject("roSGNode", "MusicSongData")
+            node.type = "audio"
+            return node
+        end if
+
+        return invalid
+    end function
+
+end namespace

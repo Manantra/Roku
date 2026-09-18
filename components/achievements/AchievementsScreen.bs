@@ -1,5 +1,6 @@
 import "pkg:/source/utils/achievementsIcons.bs"
 import "pkg:/source/utils/achievementsModel.bs"
+import "pkg:/source/utils/contentNodes.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/themeApply.bs"
 import "pkg:/source/utils/themeChrome.bs"
@@ -95,6 +96,8 @@ sub init()
     m.recap = invalid
     m.rows = []
     m.onRetry = false
+    m.badgeId = ""
+    m.chase = invalid
     m.rerollBusy = false
     m.rerollFailed = false
     m.rerollWeekly = false
@@ -126,6 +129,8 @@ sub onLoadResult(event as object)
     m.loading = false
     if result.kind = "reroll"
         applyReroll(result.weekly, result.reroll)
+    else if result.kind = "chase"
+        m.chase = result.chase
     else if result.kind = "leaderboard"
         m.boardEntries = result.entries
     else if result.kind = "recap"
@@ -193,6 +198,8 @@ sub render()
     else if m.view = "badges"
         showTabs(achievementsModel.BadgeFilters(), [tr("All"), tr("Unlocked"), tr("Locked")], m.badgeFilter)
         m.rows = badgeRows()
+    else if m.view = "badge"
+        m.rows = badgeViewRows()
     else if m.view = "quests"
         m.rows = questRows()
     else if m.view = "leaderboard"
@@ -222,6 +229,7 @@ end sub
 function breadcrumb() as string
     title = tr("Achievement Badges")
     if m.view = "badges" then return `${title} / ${tr("Badges")}`
+    if m.view = "badge" then return `${title} / ${tr("Badges")} / ${badgeName()}`
     if m.view = "quests" then return `${title} / ${tr("Quests")}`
     if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
@@ -567,7 +575,8 @@ function badgeRow(badge as object) as object
 
     row = {
         kind: "badge",
-        title: badge.isSecret ? tr("Hidden achievement") : badge.title,
+        badgeId: badge.id,
+        title: badgeTitle(badge),
         caption: "",
         icon: badge.icon,
         tint: color,
@@ -590,6 +599,79 @@ function badgeRow(badge as object) as object
     end if
 
     return row
+end function
+
+function badgeTitle(badge as object) as string
+    return badge.isSecret ? tr("Hidden achievement") : badge.title
+end function
+
+function badgeForId(badgeId as string) as dynamic
+    if not isValid(m.overview) then return invalid
+
+    for each badge in m.overview.badges
+        if badge.id = badgeId then return badge
+    end for
+    return invalid
+end function
+
+function badgeName() as string
+    badge = badgeForId(m.badgeId)
+    if not isValid(badge) then return ""
+
+    return badgeTitle(badge)
+end function
+
+' One badge on its own, with what the plugin suggests watching for it
+function badgeViewRows() as object
+    rows = []
+    badge = badgeForId(m.badgeId)
+    if not isValid(badge) then return rows
+
+    heading = headingRow(badgeTitle(badge))
+    if badge.description <> "" and not badge.descriptionHidden then heading.caption = badge.description
+    rows.push(heading)
+
+    ' The badge carries its own figures, so they stand in when the chase had nothing to say
+    current = isValid(m.chase) ? m.chase.current : badge.currentValue
+    target = isValid(m.chase) ? m.chase.target : badge.targetValue
+
+    rows.push(headingRow(tr("Progress")))
+
+    progress = headingRow(`${current} / ${target}`)
+    progress.showBar = true
+    progress.barValue = badge.progress
+    progress.barColor = achievementsModel.RarityColor(badge.rarity)
+    rows.push(progress)
+
+    rows.push(headingRow(tr("Suggested items to watch")))
+
+    items = isValid(m.chase) ? m.chase.items : []
+    if items.count() = 0
+        rows.push(headingRow(tr("Nothing to suggest for this badge.")))
+        return rows
+    end if
+
+    for each item in items
+        rows.push(chaseRow(item))
+    end for
+
+    return rows
+end function
+
+function chaseRow(item as object) as object
+    parts = []
+    if item.type <> "" then parts.push(item.type)
+    if item.year > 0 then parts.push(item.year.toStr())
+    if item.runtimeMinutes > 0 then parts.push(substitute(tr("{0} min"), item.runtimeMinutes.toStr()))
+
+    return {
+        kind: "chase",
+        itemId: item.id,
+        itemType: item.type,
+        title: item.name,
+        caption: parts.join(" · "),
+        height: 120
+    }
 end function
 
 function questRows() as object
@@ -758,6 +840,33 @@ function mediumDate(date as object) as string
     return `${months[month - 1]} ${date.GetDayOfMonth()}, ${date.GetYear()}`
 end function
 
+' ===== Badges =====
+
+sub openBadge(badgeId as string)
+    m.badgeId = badgeId
+    m.chase = invalid
+    ' The screen opens on its loading line rather than flashing an empty list of suggestions
+    m.loading = true
+    pushView("badge")
+    startLoad({ kind: "chase", badgeId: badgeId })
+end sub
+
+' Details fetches the full record by id, so the seed only has to say which item this was
+sub openChaseItem(row as object)
+    node = contentNodes.ForType(row.itemType)
+    if not isValid(node) then return
+
+    node.json = {
+        Id: row.itemId,
+        Name: row.title,
+        Type: row.itemType,
+        ImageTags: {},
+        BackdropImageTags: [],
+        UserData: {}
+    }
+    m.top.selectedItem = node
+end sub
+
 ' ===== Rerolls =====
 
 ' Spending a reroll is worth asking about, since there is no way back
@@ -915,6 +1024,16 @@ sub onRowSelected()
     row = m.rows[index]
     if row.kind = "nav"
         if isValidAndNotEmpty(row.view) then pushView(row.view)
+        return
+    end if
+
+    if row.kind = "badge"
+        openBadge(row.badgeId)
+        return
+    end if
+
+    if row.kind = "chase"
+        openChaseItem(row)
         return
     end if
 

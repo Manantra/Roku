@@ -121,6 +121,19 @@ namespace achievements
         return achievementsModel.ParseLeaderboard(GetList(path, { limit: limit }))
     end function
 
+    ' What the plugin suggests watching to move a badge along. The server picks unplayed items
+    ' that match the badge's metric, so a badge measured on something it cant query comes back
+    ' with nothing.
+    function FetchBadgeChase(badgeId as string, limit = 10 as integer) as dynamic
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) or not isValidAndNotEmpty(badgeId) then return invalid
+
+        json = GetMap(`users/${userId}/chase/${badgeId}`, { limit: limit })
+        if not isValid(json) then return invalid
+
+        return achievementsModel.ParseBadgeChase(json)
+    end function
+
     function FetchRecap(period as string) as dynamic
         userId = chainLookupReturn(m.global, "session.user.id", "")
         if not isValidAndNotEmpty(userId) then return invalid

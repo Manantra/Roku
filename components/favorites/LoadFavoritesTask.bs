@@ -1,3 +1,4 @@
+import "pkg:/source/utils/contentNodes.bs"
 import "pkg:/source/utils/diagnostics.bs"
 import "pkg:/source/utils/favoriteTabs.bs"
 import "pkg:/source/utils/misc.bs"
@@ -347,7 +348,7 @@ end function
 function buildNode(item as object, userSession as object, tabDef as object) as object
     if not isValid(item) or not isValidAndNotEmpty(item.Id) then return invalid
 
-    node = nodeForType(item.Type ?? "")
+    node = contentNodes.ForType(item.Type ?? "")
     if not isValid(node) then return invalid
 
     node.addField("favoritesTab", "string", false)
@@ -372,34 +373,6 @@ function buildNode(item as object, userSession as object, tabDef as object) as o
     node.landscapePosterURL = artwork
 
     return node
-end function
-
-function nodeForType(itemType as string) as object
-    if isStringEqual(itemType, "Movie") or isStringEqual(itemType, "MusicVideo") then return CreateObject("roSGNode", "MovieData")
-    if isStringEqual(itemType, "Series") then return CreateObject("roSGNode", "SeriesData")
-    if isStringEqual(itemType, "BoxSet") then return CreateObject("roSGNode", "CollectionData")
-    if isStringEqual(itemType, "Person") then return CreateObject("roSGNode", "PersonData")
-    if isStringEqual(itemType, "MusicArtist") then return CreateObject("roSGNode", "MusicArtistData")
-
-    if isStringEqual(itemType, "Episode")
-        node = CreateObject("roSGNode", "TVEpisode")
-        node.type = "Episode"
-        return node
-    end if
-
-    if isStringEqual(itemType, "MusicAlbum")
-        node = CreateObject("roSGNode", "MusicAlbumData")
-        node.type = "MusicAlbum"
-        return node
-    end if
-
-    if isStringEqual(itemType, "Audio")
-        node = CreateObject("roSGNode", "MusicSongData")
-        node.type = "audio"
-        return node
-    end if
-
-    return invalid
 end function
 
 function cardArtwork(item as object, shape as string, userSession as object) as string

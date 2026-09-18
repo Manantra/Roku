@@ -2565,19 +2565,36 @@ sub showAchievementsPanel()
     panel = CreateObject("roSGNode", "AchievementsScreen")
     panel.id = "achievementsOverlayPanel"
     panel.observeField("closed", "onAchievementsPanelClosed")
+    panel.observeField("selectedItem", "onAchievementsItemSelected")
     scene.appendChild(panel)
     panel.callFunc("OnScreenShown", false)
     panel.setFocus(true)
 end sub
 
 sub onAchievementsPanelClosed()
-    scene = m.top.getScene()
-    if isValid(scene)
-        panel = scene.findNode("achievementsOverlayPanel")
-        if isValid(panel) then scene.removeChild(panel)
-    end if
-
+    removeAchievementsPanel()
     m.settingsMenu.setFocus(true)
+end sub
+
+sub removeAchievementsPanel()
+    scene = m.top.getScene()
+    if not isValid(scene) then return
+
+    panel = scene.findNode("achievementsOverlayPanel")
+    if isValid(panel) then scene.removeChild(panel)
+end sub
+
+' This panel sits over the settings one, which sits over the app, so picking something to watch
+' takes both of them out of the way before the item opens under them
+sub onAchievementsItemSelected(event as object)
+    item = event.getData()
+    if not isValid(item) then return
+
+    removeAchievementsPanel()
+    dismissPanel()
+
+    activeScene = m.global.sceneManager.callFunc("getActiveScene")
+    if isValid(activeScene) and activeScene.hasField("selectedItem") then activeScene.selectedItem = item
 end sub
 
 ' What a settings entry can ask the server for before it is worth showing

@@ -182,14 +182,20 @@ namespace achievementsModel
         }
     end function
 
-    function ParseBadges(list as dynamic) as object
-        badges = []
-        if not isValidAndNotEmpty(list) then return badges
+    ' Every array the plugin sends is a list of objects, and a missing one arrives as nothing
+    ' rather than as an empty array
+    function MapList(value as dynamic, parse as function) as object
+        out = []
+        if not isValidAndNotEmpty(value) then return out
 
-        for each entry in list
-            if IsObject(entry) then badges.push(ParseBadge(entry))
+        for each entry in value
+            if IsObject(entry) then out.push(parse(entry))
         end for
-        return badges
+        return out
+    end function
+
+    function ParseBadges(list as dynamic) as object
+        return MapList(list, achievementsModel.ParseBadge)
     end function
 
     function ParseQuest(json as object) as object
@@ -211,13 +217,7 @@ namespace achievementsModel
     end function
 
     function QuestList(value as dynamic) as object
-        quests = []
-        if not isValidAndNotEmpty(value) then return quests
-
-        for each entry in value
-            if IsObject(entry) then quests.push(ParseQuest(entry))
-        end for
-        return quests
+        return MapList(value, achievementsModel.ParseQuest)
     end function
 
     function ParseQuests(json as object) as dynamic
@@ -233,6 +233,29 @@ namespace achievementsModel
             dailyRerollsLeft: AsInt(Field(json, "DailyRerollsRemaining")),
             weeklyRerollsLeft: AsInt(Field(json, "WeeklyRerollsRemaining")),
             isEmpty: daily.count() = 0 and weekly.count() = 0
+        }
+    end function
+
+    ' One thing to watch that would move a badge along. Year and runtime come back as zero when
+    ' the server holds no such value for the item.
+    function ParseChaseItem(json as object) as object
+        return {
+            id: AsString(Field(json, "Id")),
+            name: AsString(Field(json, "Name")),
+            type: AsString(Field(json, "Type")),
+            year: AsInt(Field(json, "Year")),
+            runtimeMinutes: AsInt(Field(json, "RunTimeMinutes"))
+        }
+    end function
+
+    function ParseBadgeChase(json as object) as object
+        progress = Field(json, "Progress")
+        if not IsObject(progress) then progress = {}
+
+        return {
+            current: AsInt(Field(progress, "Current")),
+            target: AsInt(Field(progress, "Target")),
+            items: MapList(Field(json, "Items"), achievementsModel.ParseChaseItem)
         }
     end function
 
@@ -262,13 +285,7 @@ namespace achievementsModel
     end function
 
     function ParseLeaderboard(list as dynamic) as object
-        rows = []
-        if not isValidAndNotEmpty(list) then return rows
-
-        for each entry in list
-            if IsObject(entry) then rows.push(ParseLeaderboardEntry(entry))
-        end for
-        return rows
+        return MapList(list, achievementsModel.ParseLeaderboardEntry)
     end function
 
     function LeaderboardValue(entry as object) as integer
@@ -277,16 +294,12 @@ namespace achievementsModel
         return 0
     end function
 
-    function CountList(value as dynamic) as object
-        counts = []
-        if not isValidAndNotEmpty(value) then return counts
+    function ParseCount(json as object) as object
+        return { name: AsString(Field(json, "Name")), count: AsInt(Field(json, "Count")) }
+    end function
 
-        for each entry in value
-            if IsObject(entry)
-                counts.push({ name: AsString(Field(entry, "Name")), count: AsInt(Field(entry, "Count")) })
-            end if
-        end for
-        return counts
+    function CountList(value as dynamic) as object
+        return MapList(value, achievementsModel.ParseCount)
     end function
 
     function ParseRecap(json as object) as dynamic

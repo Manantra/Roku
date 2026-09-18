@@ -3,6 +3,8 @@
     <interface>
         <!-- Raised when the last view is left, so whoever opened the panel takes it away -->
         <field id="closed" type="boolean" alwaysNotify="true" />
+        <!-- A suggested item the viewer picked, for whoever opened the panel to act on -->
+        <field id="selectedItem" type="node" alwaysNotify="true" />
     </interface>
     <children>
         <!-- The panel the settings screens use, so an entry opened from settings keeps the

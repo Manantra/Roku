@@ -276,6 +276,10 @@
         <translation>Nothing here yet.</translation>
     </message>
     <message>
+        <source>Nothing to suggest for this badge.</source>
+        <translation>Nothing to suggest for this badge.</translation>
+    </message>
+    <message>
         <source>Off</source>
         <translation>Off</translation>
     </message>
@@ -311,6 +315,11 @@
     <message>
         <source>Please sign in</source>
         <translation>Please sign in</translation>
+    </message>
+    <message>
+        <source>Progress</source>
+        <extracomment>How far along a badge is</extracomment>
+        <translation>Progress</translation>
     </message>
     <message>
         <source>Recap</source>
@@ -426,6 +435,10 @@
     <message>
         <source>Subtitles</source>
         <translation>Subtitles</translation>
+    </message>
+    <message>
+        <source>Suggested items to watch</source>
+        <translation>Suggested items to watch</translation>
     </message>
     <message>
         <source>Swap this set for a different one</source>
@@ -2872,6 +2885,11 @@
         <source>{0} pts</source>
         <extracomment>What a badge is worth</extracomment>
         <translation>{0} pts</translation>
+    </message>
+    <message>
+        <source>{0} min</source>
+        <extracomment>How long a suggested item runs</extracomment>
+        <translation>{0} min</translation>
     </message>
     <message>
         <source>{0} libraries</source>
