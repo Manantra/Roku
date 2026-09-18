@@ -2,8 +2,8 @@ import "pkg:/source/api/Achievements.bs"
 import "pkg:/source/utils/misc.bs"
 
 ' The panel asks for everything at once when it opens, and the leaderboard, the recap, a badge,
-' the loadout, the shop and what the viewer spends ask again as they work. All of it goes over the
-' network, so none of it runs on the render thread.
+' the activity feed, the loadout, the shop and what the viewer spends ask again as they work. All
+' of it goes over the network, so none of it runs on the render thread.
 
 sub init()
     m.top.functionName = "loadAchievements"
@@ -25,6 +25,11 @@ sub loadAchievements()
 
     if kind = "chase"
         m.top.result = { kind: kind, chase: achievements.FetchBadgeChase(request.badgeId) }
+        return
+    end if
+
+    if kind = "activity"
+        m.top.result = { kind: kind, activity: achievements.FetchActivity() }
         return
     end if
 

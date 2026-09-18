@@ -65,16 +65,16 @@ namespace achievementsModel
         return value = true
     end function
 
-    ' A badge with a timestamp the server wrote oddly should still draw, so an unreadable date
-    ' reads as nothing rather than stopping the row
-    function AsDate(value as dynamic) as dynamic
+    ' When something happened, as seconds since the epoch. All of this is read on a task thread
+    ' and drawn on the render thread, and a date object does not survive that trip while a number
+    ' does. A timestamp the server wrote oddly reads as nothing rather than stopping the row.
+    function AsSeconds(value as dynamic) as integer
         text = AsString(value)
-        if text = "" then return invalid
+        if text = "" then return 0
 
         date = CreateObject("roDateTime")
         date.FromISO8601String(text)
-        if date.AsSeconds() = 0 then return invalid
-        return date
+        return date.AsSeconds()
     end function
 
     ' Points a badge is worth. The plugin works this out from rarity rather than storing it per
@@ -180,7 +180,7 @@ namespace achievementsModel
             category: AsString(Field(json, "Category")),
             rarity: rarity,
             unlocked: unlocked,
-            unlockedAt: AsDate(Field(json, "UnlockedAt")),
+            unlockedAt: AsSeconds(Field(json, "UnlockedAt")),
             currentValue: currentValue,
             targetValue: targetValue,
             ' The plugin never sends a secret flag. It masks a locked secret badge's title
@@ -294,6 +294,22 @@ namespace achievementsModel
             bank: AsInt(Field(json, "ScoreBank")),
             slots: ParsePowerUpSlots(Field(json, "Inventory"))
         }
+    end function
+
+    ' One badge someone on this server unlocked. The feed also pages, and says who and which
+    ' badge by id, none of which this screen needs.
+    function ParseActivityEntry(json as object) as object
+        return {
+            at: AsSeconds(Field(json, "At")),
+            userName: AsString(Field(json, "UserName")),
+            badgeTitle: AsString(Field(json, "Title")),
+            rarity: AsString(Field(json, "Rarity")),
+            icon: AsString(Field(json, "Icon"))
+        }
+    end function
+
+    function ParseActivityFeed(json as object) as object
+        return MapList(Field(json, "Entries"), achievementsModel.ParseActivityEntry)
     end function
 
     ' One thing the shop sells. The name and description the catalogue carries are English only,

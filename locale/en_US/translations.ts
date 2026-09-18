@@ -22,6 +22,11 @@
         <translation>Action Buttons</translation>
     </message>
     <message>
+        <source>Activity</source>
+        <extracomment>What everyone on the server has unlocked lately</extracomment>
+        <translation>Activity</translation>
+    </message>
+    <message>
         <source>Adds a button to the menu for messages sent by your server admin</source>
         <translation>Adds a button to the menu for messages sent by your server admin</translation>
     </message>
@@ -230,6 +235,11 @@
     <message>
         <source>It comes straight out of your score bank.</source>
         <translation>It comes straight out of your score bank.</translation>
+    </message>
+    <message>
+        <source>Just now</source>
+        <extracomment>Something that happened less than a minute ago</extracomment>
+        <translation>Just now</translation>
     </message>
     <message>
         <source>Larger cards with titles underneath.</source>
@@ -894,6 +904,10 @@
     <message>
         <source>Weekly</source>
         <translation>Weekly</translation>
+    </message>
+    <message>
+        <source>What the server has unlocked lately</source>
+        <translation>What the server has unlocked lately</translation>
     </message>
     <message>
         <source>What you watched recently</source>
@@ -3023,6 +3037,26 @@
     <message>
         <source>{0} favorites sorted by {1}</source>
         <translation>{0} favorites sorted by {1}</translation>
+    </message>
+    <message>
+        <source>{0} unlocked {1}</source>
+        <extracomment>One line of the activity feed, where {0} is a user and {1} is a badge</extracomment>
+        <translation>{0} unlocked {1}</translation>
+    </message>
+    <message>
+        <source>{0}m ago</source>
+        <extracomment>Minutes since something happened</extracomment>
+        <translation>{0}m ago</translation>
+    </message>
+    <message>
+        <source>{0}h ago</source>
+        <extracomment>Hours since something happened</extracomment>
+        <translation>{0}h ago</translation>
+    </message>
+    <message>
+        <source>{0}d ago</source>
+        <extracomment>Days since something happened</extracomment>
+        <translation>{0}d ago</translation>
     </message>
 </context>
 </TS>

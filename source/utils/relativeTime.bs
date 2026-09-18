@@ -1,0 +1,22 @@
+' How long ago something happened, in the shortest wording that still says it.
+
+const RELATIVE_MINUTE = 60
+const RELATIVE_HOUR = 3600
+const RELATIVE_DAY = 86400
+
+namespace relativeTime
+
+    ' "Just now", "5m ago", "3h ago" or "2d ago" for a moment already past, given as seconds
+    ' since the epoch. A moment the server did not send has nothing to say about it.
+    function Label(at as integer) as string
+        if at <= 0 then return ""
+
+        elapsed = CreateObject("roDateTime").AsSeconds() - at
+        if elapsed < RELATIVE_MINUTE then return tr("Just now")
+        if elapsed < RELATIVE_HOUR then return substitute(tr("{0}m ago"), Int(elapsed / RELATIVE_MINUTE).toStr())
+        if elapsed < RELATIVE_DAY then return substitute(tr("{0}h ago"), Int(elapsed / RELATIVE_HOUR).toStr())
+
+        return substitute(tr("{0}d ago"), Int(elapsed / RELATIVE_DAY).toStr())
+    end function
+
+end namespace

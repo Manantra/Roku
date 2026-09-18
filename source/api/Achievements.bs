@@ -35,11 +35,11 @@ namespace achievements
         return data
     end function
 
-    ' What the admin left switched on, as the last probe found it. Both stay on until the server
+    ' What the admin left switched on, as the last probe found it. They stay on until the server
     ' says otherwise, since a plugin too old to report them still serves them.
     function Flags() as object
         info = chainLookupReturn(m.global, "session.achievementsInfo", invalid)
-        if not isValid(info) then return { available: false, leaderboardEnabled: true, questsEnabled: true }
+        if not isValid(info) then return { available: false, leaderboardEnabled: true, questsEnabled: true, activityEnabled: true }
         return info
     end function
 
@@ -52,13 +52,14 @@ namespace achievements
     function Probe() as object
         config = GetMap("public-config")
         if not isValid(config)
-            return { available: false, leaderboardEnabled: true, questsEnabled: true }
+            return { available: false, leaderboardEnabled: true, questsEnabled: true, activityEnabled: true }
         end if
 
         return {
             available: true,
             leaderboardEnabled: achievementsModel.Field(config, "LeaderboardEnabled") <> false,
-            questsEnabled: achievementsModel.Field(config, "QuestsEnabled") <> false
+            questsEnabled: achievementsModel.Field(config, "QuestsEnabled") <> false,
+            activityEnabled: achievementsModel.Field(config, "ActivityFeedEnabled") <> false
         }
     end function
 
@@ -143,6 +144,17 @@ namespace achievements
             outcome: POWER_UP_USED,
             slots: achievementsModel.ParsePowerUpSlots(achievementsModel.Field(written.body, "Inventory"))
         }
+    end function
+
+    ' What the server has unlocked lately, newest first. It can come back empty because the admin
+    ' switched the feed off, or because everyone on the server has opted out of appearing in it.
+    function FetchActivity(limit = 30 as integer) as object
+        if not Flags().activityEnabled then return []
+
+        json = GetMap("activity-feed", { page: 1, pageSize: limit })
+        if not isValid(json) then return []
+
+        return achievementsModel.ParseActivityFeed(json)
     end function
 
     ' What the shop sells, narrowed to the power-ups. The catalogue is the same for everyone, so
@@ -233,7 +245,8 @@ namespace achievements
             recap: achievementsModel.ParseRecap(GetMap(`users/${userId}/recap`, { period: ACHIEVEMENTS_DEFAULT_PERIOD })),
             libraryCompletion: achievementsModel.ParseLibraryCompletion(GetMap(`users/${userId}/library-completion`)),
             leaderboardEnabled: config.leaderboardEnabled,
-            questsEnabled: config.questsEnabled
+            questsEnabled: config.questsEnabled,
+            activityEnabled: config.activityEnabled
         }
     end function
 

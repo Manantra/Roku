@@ -2,6 +2,7 @@ import "pkg:/source/utils/achievementsIcons.bs"
 import "pkg:/source/utils/achievementsModel.bs"
 import "pkg:/source/utils/contentNodes.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/relativeTime.bs"
 import "pkg:/source/utils/themeApply.bs"
 import "pkg:/source/utils/themeChrome.bs"
 
@@ -98,6 +99,7 @@ sub init()
     m.retryKind = ""
     m.badgeId = ""
     m.chase = invalid
+    m.activity = []
     m.powerUps = invalid
     m.shopItems = []
     m.shopBank = 0
@@ -139,6 +141,8 @@ sub onLoadResult(event as object)
         applyReroll(result.weekly, result.reroll)
     else if result.kind = "chase"
         m.chase = result.chase
+    else if result.kind = "activity"
+        m.activity = result.activity
     else if result.kind = "powerups"
         m.powerUps = result.powerUps
     else if result.kind = "shop"
@@ -220,6 +224,8 @@ sub render()
         m.rows = badgeRows()
     else if m.view = "badge"
         m.rows = badgeViewRows()
+    else if m.view = "activity"
+        m.rows = activityRows()
     else if m.view = "loadout"
         if not m.loading and not isValid(m.powerUps)
             showLoadFailed("powerups")
@@ -259,6 +265,7 @@ function breadcrumb() as string
     if m.view = "badges" then return `${title} / ${tr("Badges")}`
     if m.view = "badge" then return `${title} / ${tr("Badges")} / ${badgeName()}`
     if m.view = "quests" then return `${title} / ${tr("Quests")}`
+    if m.view = "activity" then return `${title} / ${tr("Activity")}`
     if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
     if m.view = "loadout" then return `${title} / ${tr("Loadout")}`
@@ -557,6 +564,10 @@ function overviewRows() as object
         rows.push(navRow("quests", tr("Quests"), substitute(tr("{0} completed"), done.toStr()), "task_alt", true))
     end if
 
+    if m.overview.activityEnabled
+        rows.push(navRow("activity", tr("Activity"), tr("What the server has unlocked lately"), "bolt", true))
+    end if
+
     if m.overview.leaderboardEnabled
         rows.push(navRow("leaderboard", tr("Leaderboard"), tr("How you compare with other users on this server"), "leaderboard", true))
     end if
@@ -635,7 +646,7 @@ function badgeRow(badge as object) as object
         row.barValue = badge.progress
         row.barColor = color
         row.progressText = `${badge.currentValue} / ${badge.targetValue}`
-    else if badge.unlocked and isValid(badge.unlockedAt)
+    else if badge.unlocked and badge.unlockedAt > 0
         row.progressText = substitute(tr("Unlocked {0}"), mediumDate(badge.unlockedAt))
     end if
 
@@ -828,6 +839,33 @@ function shopRow(item as object) as object
     }
 end function
 
+function activityRows() as object
+    rows = []
+    for each entry in m.activity
+        rows.push(activityRow(entry))
+    end for
+
+    return rows
+end function
+
+function activityRow(entry as object) as object
+    return {
+        kind: "activity",
+        title: substitute(tr("{0} unlocked {1}"), entry.userName, entry.badgeTitle),
+        icon: entry.icon,
+        tint: achievementsModel.RarityColor(entry.rarity),
+        progressText: relativeTime.Label(entry.at),
+        height: 120
+    }
+end function
+
+sub openActivity()
+    m.activity = []
+    m.loading = true
+    pushView("activity")
+    startLoad({ kind: "activity" })
+end sub
+
 sub openShop()
     m.shopItems = []
     m.shopBank = 0
@@ -1011,8 +1049,10 @@ function formatPercent(value as float) as string
     return `${Int(tenths / 10)}.${tenths mod 10}%`
 end function
 
-function mediumDate(date as object) as string
+function mediumDate(seconds as integer) as string
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    date = CreateObject("roDateTime")
+    date.FromSeconds(seconds)
     month = date.GetMonth()
     if month < 1 or month > 12 then return ""
     return `${months[month - 1]} ${date.GetDayOfMonth()}, ${date.GetYear()}`
@@ -1264,7 +1304,9 @@ sub onRowSelected()
 
     row = m.rows[index]
     if row.kind = "nav"
-        if row.view = "loadout"
+        if row.view = "activity"
+            openActivity()
+        else if row.view = "loadout"
             openLoadout()
         else if row.view = "shop"
             openShop()
