@@ -12,7 +12,8 @@ namespace MainAction
         if not isValid(activeScene) or not isValid(activeScene.itemContent) then return
 
         startLoadingSpinner()
-        activeScene.itemContent.id = chainLookup(activeScene, "selectedVideoStreamId")
+        playVersionId = chainLookup(activeScene, "selectedVideoStreamId")
+        if isValidAndNotEmpty(playVersionId) then activeScene.itemContent.id = playVersionId
 
         ' Check if a specific Audio Stream was selected
         activeScene.itemContent.selectedAudioStreamIndex = chainLookup(activeScene, "selectedAudioStreamIndex") ?? 0
@@ -42,7 +43,8 @@ namespace MainAction
     sub onPlayFromBeginningClicked(activeScene as object)
         ' Play from beginning - reset position to 0 and play
         startLoadingSpinner()
-        activeScene.itemContent.id = chainLookup(activeScene, "selectedVideoStreamId")
+        playVersionId = chainLookup(activeScene, "selectedVideoStreamId")
+        if isValidAndNotEmpty(playVersionId) then activeScene.itemContent.id = playVersionId
 
         ' Check if a specific Audio Stream was selected
         activeScene.itemContent.selectedAudioStreamIndex = chainLookup(activeScene, "selectedAudioStreamIndex") ?? 0
