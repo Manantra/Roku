@@ -6,6 +6,7 @@ import "pkg:/source/api/sdk.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
 import "pkg:/source/utils/HomeRecommendations.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
 
 ' Fast parallel loading task for TV show details
@@ -572,7 +573,7 @@ end function
 
 function loadSimilar() as object
     settings = m.global.session.user.settings
-    recSource = settings["ui.home.recommendationSource"] ?? ""
+    recSource = kidsMode.RecommendationSource(settings["ui.home.recommendationSource"] ?? "")
     if recSource = ""
         recSource = settings["ui.home.sinceYouWatchedSource"] ?? "local"
     end if

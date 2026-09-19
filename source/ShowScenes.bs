@@ -1,6 +1,8 @@
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/enums/ImageType.bs"
 import "pkg:/source/enums/ItemType.bs"
+import "pkg:/source/utils/kidsMode.bs"
+import "pkg:/source/utils/minimalistRules.bs"
 import "pkg:/source/utils/misc.bs"
 
 const minimumServerVersion = [10, 9, 0]
@@ -576,16 +578,23 @@ function usesRichDetailScreen() as boolean
     return not isStringEqual(detailScreenComponent(), "ItemDetails")
 end function
 
-' Picks the detail screen the user chose.
-function detailScreenComponent() as string
+' Picks the detail screen the user chose. An item type narrows that down where a style
+' only draws some of them, and is left out where the answer is about the style itself.
+function detailScreenComponent(itemType = "" as string) as string
     style = chainLookupReturn(m.global.session, "user.settings.`ui.itemdetail.style`", "modern")
 
     ' Normalize first so a token synced from another client (v4, nouveau) still
     ' routes to a real screen instead of falling through to modern silently.
-    style = normalizeDetailScreenStyleToken(style)
+    style = normalizeDetailScreenStyleToken(kidsMode.DetailStyle(style))
     if isStringEqual(style, "classic") then return "ItemDetails"
     if isStringEqual(style, "spotlight") then return "SpotlightItemDetails"
     if isStringEqual(style, "nouveau") then return "NouveauItemDetails"
+    if isStringEqual(style, "minimalist")
+        ' A person, an album or a playlist falls through to Spotlight, which already knows
+        ' how to draw one
+        if itemType = "" or minimalistRules.Draws(itemType) then return "MinimalistItemDetails"
+        return "SpotlightItemDetails"
+    end if
     return "ModernItemDetails"
 end function
 
@@ -618,8 +627,8 @@ function CreateMovieDetailsGroup(movie as object) as dynamic
     end if
 
     ' Unified detail screen for both movies and episodes
-    group = CreateObject("roSGNode", detailScreenComponent())
     itemType = LCase(movieMetaData.json.type)
+    group = CreateObject("roSGNode", detailScreenComponent(itemType))
     group.itemType = itemType
     group.observeField("quickPlayNode", m.port)
     group.observeFieldScoped("selectedItem", m.port)
@@ -774,7 +783,7 @@ function CreateSeriesDetailsGroup(seriesID as string, seriesServerData = invalid
     end if
 
     ' Build unified ItemDetails view for series
-    group = CreateObject("roSGNode", detailScreenComponent())
+    group = CreateObject("roSGNode", detailScreenComponent("series"))
     group.itemType = "series"
     group.observeField("quickPlayNode", m.port)
     group.observeFieldScoped("selectedItem", m.port)
@@ -852,7 +861,7 @@ function CreateArtistView(artist as object) as dynamic
         group.observeField("shuffleAlbumSelected", m.port)
         group.observeField("instantMixSelected", m.port)
     else if usesRichMusicScreen()
-        group = CreateObject("roSGNode", detailScreenComponent())
+        group = CreateObject("roSGNode", detailScreenComponent("musicartist"))
         group.itemType = "musicartist"
         group.optionsAvailable = false
         group.observeField("selectedAlbum", m.port)
@@ -890,7 +899,7 @@ function CreateAlbumView(album as object) as dynamic
     startLoadingSpinner()
 
     if usesRichMusicScreen()
-        group = CreateObject("roSGNode", detailScreenComponent())
+        group = CreateObject("roSGNode", detailScreenComponent("musicalbum"))
         group.itemType = "musicalbum"
         group.optionsAvailable = false
         group.observeField("playSong", m.port)
@@ -930,7 +939,7 @@ sub CreatePlaylistView(playlist as object)
     startLoadingSpinner()
 
     if usesRichMusicScreen()
-        group = CreateObject("roSGNode", detailScreenComponent())
+        group = CreateObject("roSGNode", detailScreenComponent("playlist"))
         group.itemType = "playlist"
         group.optionsAvailable = false
         group.observeField("playlistItemSelected", m.port)
@@ -977,7 +986,7 @@ function CreateSeasonDetailsGroup(series as object, season as object) as dynamic
     displayResumeButton = hasSeasonEpisodeToResume(series.id, season.id)
 
     if usesRichDetailScreen()
-        group = CreateObject("roSGNode", detailScreenComponent())
+        group = CreateObject("roSGNode", detailScreenComponent("season"))
         group.itemType = "season"
         group.optionsAvailable = false
         group.displayResumeButton = displayResumeButton
@@ -1032,7 +1041,7 @@ function CreateSeasonDetailsGroupByID(seriesID as string, seasonID as string, se
     displayResumeButton = hasSeasonEpisodeToResume(seriesID, seasonID)
 
     if usesRichDetailScreen()
-        group = CreateObject("roSGNode", detailScreenComponent())
+        group = CreateObject("roSGNode", detailScreenComponent("season"))
         group.itemType = "season"
         group.optionsAvailable = false
         group.displayResumeButton = displayResumeButton

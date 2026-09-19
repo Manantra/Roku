@@ -1481,6 +1481,7 @@ function SeerrDetailScreenComponent() as string
     if style = "classic" then return "ItemDetails"
     if style = "spotlight" then return "SpotlightItemDetails"
     if style = "nouveau" then return "NouveauItemDetails"
+    if style = "minimalist" then return "MinimalistItemDetails"
 
     return "ModernItemDetails"
 end function

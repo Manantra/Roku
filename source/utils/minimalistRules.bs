@@ -1,0 +1,105 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/api/MoonfinPlugin.bs"
+import "pkg:/source/enums/ImageType.bs"
+import "pkg:/source/utils/kidsMode.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/multiserver.bs"
+
+' The item types Minimalist draws. Everything else falls through to Spotlight, which already knows
+' how to draw a person, an album or a playlist.
+const MINIMALIST_TYPES = ["movie", "series", "season", "episode", "video", "musicvideo"]
+
+' An episode carries the season tabs as well, so arriving on one still leaves the rest of the show
+' a press away.
+const MINIMALIST_EPISODE_TYPES = ["series", "season", "episode"]
+
+' A flat darkening over the artwork rather than a gradient.
+'
+' The other styles lay gradients under their text and can fade the picture all the way out.
+' Minimalist puts the title and the buttons straight on it, so the darkening keeps a floor: at the
+' bottom of the slider the screen is still readable rather than merely bright.
+const MINIMALIST_MIN_SCRIM = 0.35
+const MINIMALIST_MAX_SCRIM = 0.85
+
+namespace minimalistRules
+
+    function Draws(itemType as string) as boolean
+        return inArray(MINIMALIST_TYPES, LCase(itemType))
+    end function
+
+    function ShowsEpisodes(itemType as string) as boolean
+        return inArray(MINIMALIST_EPISODE_TYPES, LCase(itemType))
+    end function
+
+    function ScrimOpacity(blurAmount as integer) as float
+        return MINIMALIST_MIN_SCRIM + (blurAmount / 25.0) * (MINIMALIST_MAX_SCRIM - MINIMALIST_MIN_SCRIM)
+    end function
+
+    ' The text that stands in where the logo would go, for when the server has none to give.
+    '
+    ' On an episode the show is named first and the episode's own name sits under it, so the
+    ' artwork still says what you are in while the line below says which part of it.
+    function Branding(itemData as object, itemType as string) as object
+        style = LCase(itemType)
+        named = ""
+        if style = "episode" or style = "season" then named = chainLookupReturn(itemData, "SeriesName", "")
+
+        title = isValidAndNotEmpty(named) ? named : chainLookupReturn(itemData, "Name", "")
+        episodeName = style = "episode" ? chainLookupReturn(itemData, "Name", "") : ""
+
+        return { title: title, episodeName: episodeName }
+    end function
+
+    ' Whether stills are kept out of sight, which is the parent's choice everywhere but Kids Mode.
+    function UsesSeriesThumbnails() as boolean
+        chosen = moonfinPlugin.ParseBoolSetting(chainLookupReturn(m.global.session, "user.settings.`ui.itemdetail.useSeriesThumbnails`", false), false)
+        return kidsMode.SeriesThumbnails(chosen)
+    end function
+
+    ' The episode's own still, opposite the title. Only ever its own picture: the show's artwork
+    ' here would put a second copy of the backdrop on screen, and the series thumbnail setting
+    ' exists to keep stills out of sight, so with it on there is nothing to show.
+    function StillUrl(itemData as object, itemType as string, width as integer) as string
+        if LCase(itemType) <> "episode" or UsesSeriesThumbnails() then return ""
+
+        tag = chainLookupReturn(itemData, "ImageTags.Primary", invalid)
+        if not isValid(tag) then return ""
+
+        return ImageUrlFor(itemData, itemData.id, ImageType.PRIMARY, tag, width * 2)
+    end function
+
+    ' The picture for one episode card.
+    '
+    ' Specials are the case worth knowing about: an episode outside a numbered season often has no
+    ' still of its own, so the series thumbnail is all there is.
+    function CardUrl(episodeData as object, cardWidth as integer) as string
+        if UsesSeriesThumbnails()
+            series = SeriesUrl(episodeData, cardWidth)
+            if series <> "" then return series
+        end if
+
+        own = chainLookupReturn(episodeData, "ImageTags.Primary", invalid)
+        if isValid(own) then return ImageUrlFor(episodeData, episodeData.id, ImageType.PRIMARY, own, cardWidth * 2)
+
+        return SeriesUrl(episodeData, cardWidth)
+    end function
+
+    function SeriesUrl(episodeData as object, cardWidth as integer) as string
+        source = getSeriesThumbnailSource(episodeData)
+        if not isValid(source) then return ""
+
+        return ImageUrlFor(episodeData, source.id, source.imageType, source.tag, cardWidth * 2)
+    end function
+
+    ' An item carries the server it came from when more than one is signed in, so the picture is
+    ' asked of that server rather than whichever one the session happens to be pointed at.
+    function ImageUrlFor(itemData as object, itemId as string, imageVersion as string, tag as string, maxWidth as integer) as string
+        params = { "maxWidth": maxWidth, "quality": 90, "Tag": tag }
+
+        serverUrl = chainLookupReturn(itemData, "_serverUrl", "")
+        if isValidAndNotEmpty(serverUrl) then return buildImageURLForServer(serverUrl, itemId, imageVersion, params)
+
+        return ImageURL(itemId, imageVersion, params)
+    end function
+
+end namespace

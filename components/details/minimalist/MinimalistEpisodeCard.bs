@@ -1,0 +1,86 @@
+import "pkg:/source/utils/fontApply.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+const MINIMALIST_CARD_TITLE_GAP = 8
+const MINIMALIST_CARD_TITLE_LINES = 2
+const MINIMALIST_BADGE_INSET = 8
+const MINIMALIST_BADGE_PAD = 11
+const MINIMALIST_NUMBER_HEIGHT = 26
+const MINIMALIST_WATCHED_SIZE = 22
+
+sub init()
+    m.artMask = m.top.findNode("artMask")
+    m.artBg = m.top.findNode("artBg")
+    m.artImage = m.top.findNode("artImage")
+    m.artFocus = m.top.findNode("artFocus")
+    m.numberBadge = m.top.findNode("numberBadge")
+    m.numberFill = m.top.findNode("numberFill")
+    m.numberText = m.top.findNode("numberText")
+    m.watchedBadge = m.top.findNode("watchedBadge")
+    m.cardTitle = m.top.findNode("cardTitle")
+
+    m.numberFill.height = MINIMALIST_NUMBER_HEIGHT
+    m.numberText.height = MINIMALIST_NUMBER_HEIGHT
+    m.numberText.font.size = fontApply.ThemeTextSize(17)
+    m.cardTitle.font.size = fontApply.ThemeTextSize(18)
+    ' Room for both lines whatever size the theme's font came out at
+    m.titleHeight = Int(m.cardTitle.font.size * 1.25) * MINIMALIST_CARD_TITLE_LINES + 4
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+sub onCardSizeChanged()
+    size = m.top.cardSize
+    if not isValidAndNotEmpty(size) or size.count() < 2 then return
+
+    width = size[0]
+    height = size[1]
+
+    m.artMask.maskSize = [width, height]
+    m.artBg.width = width
+    m.artBg.height = height
+    m.artImage.width = width
+    m.artImage.height = height
+    m.artFocus.width = width
+    m.artFocus.height = height
+
+    m.cardTitle.width = width
+    m.cardTitle.height = m.titleHeight
+    m.cardTitle.translation = [0, height + MINIMALIST_CARD_TITLE_GAP]
+
+    m.watchedBadge.translation = [width - MINIMALIST_WATCHED_SIZE - MINIMALIST_BADGE_INSET, MINIMALIST_BADGE_INSET]
+
+    m.top.cardHeight = height + MINIMALIST_CARD_TITLE_GAP + m.titleHeight
+    layoutNumber()
+end sub
+
+sub onCardDataChanged()
+    data = m.top.cardData
+    if not isValid(data) then return
+
+    m.artImage.uri = isValid(data.imageUrl) ? data.imageUrl : ""
+    m.cardTitle.text = isValid(data.title) ? data.title : ""
+    m.watchedBadge.visible = data.watched = true
+
+    ' A card with no number of its own carries the sentinel the screen sends in place of invalid
+    hasNumber = isValid(data.number) and data.number >= 0
+    m.numberText.text = hasNumber ? data.number.toStr() : ""
+    m.numberBadge.visible = hasNumber
+    layoutNumber()
+end sub
+
+sub layoutNumber()
+    if not m.numberBadge.visible then return
+
+    width = m.numberText.boundingRect().width + MINIMALIST_BADGE_PAD * 2
+    m.numberText.width = width
+    m.numberFill.width = width
+
+    height = m.top.cardSize.count() > 1 ? m.top.cardSize[1] : 0
+    m.numberBadge.translation = [MINIMALIST_BADGE_INSET, height - MINIMALIST_NUMBER_HEIGHT - MINIMALIST_BADGE_INSET]
+end sub
+
+sub onFocusedChanged()
+    m.artFocus.visible = m.top.focused
+end sub

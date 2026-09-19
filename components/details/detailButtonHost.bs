@@ -39,7 +39,12 @@ sub addArrangedButtons(candidates as object)
         candidates.push(candidate)
     end for
 
-    for each candidate in buttonLayout.Arrange(kidsMode.KeepButtons(buttonLayout.InCatalogueOrder(candidates)), order, hidden)
+    ' Kids Mode sets the saved arrangement aside rather than filtering it, since its own short row
+    ' is the point and a reorder would otherwise put a button it hides back
+    offered = buttonLayout.InCatalogueOrder(candidates)
+    arranged = kidsMode.Enabled() ? kidsMode.KeepButtons(offered) : buttonLayout.Arrange(offered, order, hidden)
+
+    for each candidate in arranged
         addButton(candidate.config)
     end for
 end sub

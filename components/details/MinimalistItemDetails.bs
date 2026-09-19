@@ -1,0 +1,642 @@
+import "pkg:/components/details/detailButtonHost.bs"
+import "pkg:/components/details/detailMetadataHost.bs"
+import "pkg:/components/details/detailPopulationHost.bs"
+import "pkg:/components/details/detailScreenHost.bs"
+import "pkg:/components/details/detailTrackHost.bs"
+import "pkg:/source/utils/detailButtons.bs"
+import "pkg:/source/utils/fontApply.bs"
+import "pkg:/source/utils/minimalistRules.bs"
+import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/nouveauLayout.bs"
+import "pkg:/source/utils/seerrDetailHost.bs"
+import "pkg:/source/utils/themeApply.bs"
+
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/ViewLoadStatus.bs"
+
+' The smallest detail screen: artwork, the title, one row of buttons and the episodes. No cast, no
+' chapters, no collection, no recommendations.
+'
+' Kids Mode always shows this one. Outside Kids Mode it is an ordinary style, for anyone who wants
+' the screen to get out of the way.
+
+' The page sits inside the same margins the other rail screens use, and everything in it is
+' measured up from the bottom edge
+const MINIMALIST_INSET = 56
+const MINIMALIST_BOTTOM = 44
+const MINIMALIST_HEADLINE_WIDTH = 760
+const MINIMALIST_EPISODE_NAME_GAP = 14
+const MINIMALIST_ACTIONS_GAP = 26
+const MINIMALIST_BUTTON_ROW_HEIGHT = 75
+' The widest the still is ever drawn, sixteen by nine since these sets have no aspect ratio to ask
+' for
+const MINIMALIST_STILL_WIDTH = 440
+const MINIMALIST_STILL_HEIGHT = 247
+const MINIMALIST_ASIDE_GAP = 48
+const MINIMALIST_EPISODES_GAP = 34
+const MINIMALIST_SEASON_BAR_GAP = 18
+const MINIMALIST_CARD_WIDTH = 266
+const MINIMALIST_CARD_IMAGE_HEIGHT = 150
+const MINIMALIST_CARD_GAP = 20
+' The headline column is only so wide, and the still sits against its far edge, so the row keeps
+' to five and hands the rest to a menu
+const MINIMALIST_MAX_BUTTONS = 5
+' A button is an icon until focus opens it up to show its label
+const MINIMALIST_BUTTON_WIDTH = 75
+const MINIMALIST_BUTTON_GAP = 12
+const MINIMALIST_BUTTON_LABEL_PAD = 41
+
+sub init()
+    m.loadStatus = ViewLoadStatus.INIT
+
+    m.headline = m.top.findNode("headline")
+    m.logoGroup = m.top.findNode("logoGroup")
+    m.logoImage = m.top.findNode("logoImage")
+    m.titleNode = m.top.findNode("title")
+    m.episodeName = m.top.findNode("episodeName")
+    m.buttonRow = m.top.findNode("buttonRow")
+    m.aside = m.top.findNode("aside")
+    m.stillImage = m.top.findNode("stillImage")
+    m.episodesGroup = m.top.findNode("episodes")
+    m.seasonBar = m.top.findNode("seasonBar")
+    m.seasonBar.observeField("escape", "onSeasonBarEscape")
+    m.seasonBar.observeField("activated", "onSeasonActivated")
+    m.episodeRail = m.top.findNode("episodeRail")
+
+    m.overflowMenu = m.top.findNode("overflowMenu")
+    m.overflowMenu.observeField("chosenAction", "onOverflowAction")
+    m.overflowMenu.observeField("closed", "onOverflowClosed")
+
+    m.backdropScrim = m.top.findNode("backdropScrim")
+
+    m.favoriteTask = m.top.findNode("favoriteTask")
+    m.playstateTask = m.top.findNode("playstateTask")
+    m.themeMusicPlayer = m.top.findNode("themeMusicPlayer")
+
+    ' The pickers the action row opens, which the button host reaches through m
+    m.audioSelector = m.top.findNode("audioSelector")
+    m.subtitleSelector = m.top.findNode("subtitleSelector")
+    m.subtitleDownloadDialog = m.top.findNode("subtitleDownloadDialog")
+    m.versionSelector = m.top.findNode("versionSelector")
+
+    m.buttonGroups = []
+    m.overflowActions = []
+    m.currentButtonIndex = 0
+
+    m.episodeItems = []
+    m.seasonNumbers = []
+    m.activeSeason = 0
+    m.pickedSeason = invalid
+    m.railCards = []
+
+    ' Nothing on this screen draws the Seerr facts or the extras, so the pieces the shared hosts
+    ' reach for when they have them stay empty
+    m.seerrBlock = invalid
+    m.extrasGrid = invalid
+    m.sectionItems = []
+    m.tabGrid = invalid
+
+    m.top.observeField("itemContent", "itemContentChanged")
+
+    ' The track host already knows how to hand focus back when a picker closes, it just needs to
+    ' be told when that happens
+    m.audioSelector.observeField("audioStreamIndex", "onAudioStreamIndexChanged")
+    m.audioSelector.observeField("visible", "onAudioSelectorVisibleChanged")
+    m.subtitleSelector.observeField("subtitleStream", "onSubtitleStreamChanged")
+    m.subtitleSelector.observeField("visible", "onSubtitleSelectorVisibleChanged")
+    m.subtitleSelector.observeField("downloadRequested", "onSubtitleDownloadRequested")
+    m.subtitleDownloadDialog.observeField("visible", "onSubtitleDownloadDialogVisibleChanged")
+    m.versionSelector.observeField("videoStreamId", "onVersionSelected")
+    m.versionSelector.observeField("visible", "onVersionSelectorVisibleChanged")
+
+    m.top.optionsAvailable = false
+
+    m.titleNode.font.size = fontApply.ThemeTextSize(56)
+    m.episodeName.font.size = fontApply.ThemeTextSize(34)
+    stillBg = m.top.findNode("stillBg")
+    stillBg.width = MINIMALIST_STILL_WIDTH
+    stillBg.height = MINIMALIST_STILL_HEIGHT
+    m.stillImage.width = MINIMALIST_STILL_WIDTH
+    m.stillImage.height = MINIMALIST_STILL_HEIGHT
+    m.top.findNode("stillMask").maskSize = [MINIMALIST_STILL_WIDTH, MINIMALIST_STILL_HEIGHT]
+    m.titleNode.width = MINIMALIST_HEADLINE_WIDTH
+    m.episodeName.width = MINIMALIST_HEADLINE_WIDTH
+    m.top.findNode("content").translation = [MINIMALIST_INSET, 0]
+    m.seasonBar.maxWidth = 1920 - MINIMALIST_INSET * 2
+
+    themeApply.ApplyToItem(m.top)
+end sub
+
+' ===== Content =====
+
+sub itemContentChanged()
+    item = m.top.itemContent
+    if not isChainValid(item, "json")
+        stopLoadingSpinner()
+        return
+    end if
+
+    itemData = item.json
+    m.top.id = itemData.id
+
+    loadSeerrBlock(itemData)
+
+    if isValid(m.themeMusicPlayer) and not m.top.seerrOnly
+        m.themeMusicPlayer.itemId = itemData.id
+    end if
+
+    m.top.trailerAvailable = isValidAndNotEmpty(itemData.RemoteTrailers) or isValidAndNotEmpty(itemData.LocalTrailerCount)
+
+    updateButtonVisibility(itemData)
+
+    if m.loadStatus = ViewLoadStatus.RELOAD
+        stopLoadingSpinner()
+        return
+    end if
+
+    applyBackdropTreatment()
+    setBackdropImage(itemData)
+
+    branding = minimalistRules.Branding(itemData, m.top.itemType)
+    m.titleNode.text = branding.title
+    m.episodeName.text = branding.episodeName
+    m.episodeName.visible = isValidAndNotEmpty(branding.episodeName)
+    m.titleNode.visible = not m.logoGroup.visible
+
+    stillUrl = minimalistRules.StillUrl(itemData, m.top.itemType, MINIMALIST_STILL_WIDTH)
+    m.stillImage.uri = stillUrl
+    m.aside.visible = stillUrl <> ""
+
+    loadEpisodes(itemData)
+    layoutContainer()
+    stopLoadingSpinner()
+end sub
+
+' A season already carries its own episodes. A series, or one episode of one, is given the whole
+' run at once, so the tabs filter a list that is already here.
+sub loadEpisodes(itemData as object)
+    if not minimalistRules.ShowsEpisodes(m.top.itemType) then return
+    if isSeason() then return
+
+    seriesId = isSeries() ? m.top.id : chainLookupReturn(itemData, "SeriesId", "")
+    if not isValidAndNotEmpty(seriesId) then return
+
+    task = CreateObject("roSGNode", "NouveauSeriesEpisodesTask")
+    task.seriesId = seriesId
+    task.observeField("episodes", "onSeriesEpisodesLoaded")
+    task.control = TaskControl.RUN
+end sub
+
+sub onSeriesEpisodesLoaded(event as object)
+    m.episodeItems = event.getData()
+    rebuildEpisodes()
+end sub
+
+' Season episodes arrive from the factory as { Items: [TVEpisodeData...] }
+sub onSeasonEpisodesLoaded()
+    data = m.top.seasonEpisodesData
+    if not isValid(data) or not isValid(data.Items) then return
+
+    m.episodeItems = data.Items
+    rebuildEpisodes()
+end sub
+
+' ===== Episodes =====
+
+sub rebuildEpisodes()
+    grouped = nouveauLayout.GroupEpisodesBySeason(m.episodeItems)
+    m.seasonNumbers = grouped.numbers
+
+    if m.seasonNumbers.count() = 0
+        m.episodesGroup.visible = false
+        layoutContainer()
+        return
+    end if
+
+    ' Landing on an episode opens its own season rather than the first one
+    arrivedIn = invalid
+    if isEpisode() then arrivedIn = nouveauLayout.SeasonOf(m.top.itemContent)
+    m.activeSeason = nouveauLayout.EffectiveSeason(m.seasonNumbers, m.pickedSeason, arrivedIn)
+
+    ' One season is no choice at all, so the strip only earns its space when there is somewhere
+    ' else to go, and the rail takes over as the way in
+    showsTabs = m.seasonNumbers.count() > 1
+    if showsTabs
+        tabs = []
+        active = 0
+        index = 0
+        ' Nothing here loads the seasons themselves, so a tab is numbered rather than named
+        for each option in nouveauLayout.SeasonOptions(m.seasonNumbers, [])
+            tabs.push({ id: option.id, label: option.label })
+            if option.id = m.activeSeason.toStr() then active = index
+            index++
+        end for
+
+        m.seasonBar.tabs = tabs
+        m.seasonBar.expanded = false
+        m.seasonBar.focusIndex = active
+        m.seasonBar.selectedIndex = active
+    end if
+    m.seasonBar.visible = showsTabs
+
+    m.railCards = grouped.buckets[m.activeSeason.toStr()]
+    if not isValid(m.railCards) then m.railCards = []
+
+    cards = []
+    for each episode in m.railCards
+        json = episode.json
+        cards.push({
+            imageUrl: minimalistRules.CardUrl(json, MINIMALIST_CARD_WIDTH),
+            title: chainLookupReturn(json, "Name", ""),
+            ' An episode outside a numbered season has none to show, and invalid does not survive
+            ' the trip into a node's field
+            number: chainLookupReturn(json, "IndexNumber", -1),
+            watched: chainLookupReturn(json, "UserData.Played", false)
+        })
+    end for
+
+    m.episodeRail.callFunc("setContent", {
+        title: "",
+        component: "MinimalistEpisodeCard",
+        cardSize: [MINIMALIST_CARD_WIDTH, MINIMALIST_CARD_IMAGE_HEIGHT],
+        gap: MINIMALIST_CARD_GAP,
+        stopsPerCard: 1,
+        cards: cards
+    })
+
+    m.episodesGroup.visible = cards.count() > 0
+    layoutContainer()
+end sub
+
+' A season is committed by pressing it, so focus drops into what it opened
+sub onSeasonActivated()
+    index = m.seasonBar.activated
+    if index < 0 or index >= m.seasonNumbers.count() then return
+
+    m.pickedSeason = m.seasonNumbers[index]
+    rebuildEpisodes()
+    focusRail()
+end sub
+
+' Up out of the tabs lands on the buttons, and down carries on into the rail
+sub onSeasonBarEscape()
+    if m.seasonBar.escape = "up"
+        focusButton(m.currentButtonIndex)
+    else
+        focusRail()
+    end if
+end sub
+
+sub focusRail()
+    if m.episodeRail.stopCount = 0 then return
+
+    m.episodeRail.callFunc("focusStop", 0)
+    m.top.lastFocus = m.episodeRail
+    setLastFocus(m.episodeRail)
+end sub
+
+sub focusSeasonBar()
+    m.episodeRail.callFunc("clearFocus")
+    m.seasonBar.setFocus(true)
+    m.top.lastFocus = m.seasonBar
+    setLastFocus(m.seasonBar)
+end sub
+
+sub openFocusedEpisode()
+    index = m.episodeRail.focusedStop
+    if index < 0 or index >= m.railCards.count() then return
+
+    m.top.selectedItem = m.railCards[index]
+end sub
+
+' ===== Layout =====
+
+sub layoutContainer()
+    bottom = 1080 - MINIMALIST_BOTTOM
+
+    episodesHeight = 0
+    if m.episodesGroup.visible
+        barHeight = 0
+        if m.seasonBar.visible then barHeight = m.seasonBar.boundingRect().height + MINIMALIST_SEASON_BAR_GAP
+
+        m.episodeRail.translation = [0, barHeight]
+        episodesHeight = barHeight + m.episodeRail.railHeight
+        m.episodesGroup.translation = [0, bottom - episodesHeight]
+    end if
+
+    upperBottom = bottom
+    if episodesHeight > 0 then upperBottom -= episodesHeight + MINIMALIST_EPISODES_GAP
+
+    y = 0
+    if m.logoGroup.visible
+        m.logoGroup.translation = [0, 0]
+        y = m.logoImage.height
+    else
+        m.titleNode.translation = [0, 0]
+        y = m.titleNode.boundingRect().height
+    end if
+
+    if m.episodeName.visible
+        y += MINIMALIST_EPISODE_NAME_GAP
+        m.episodeName.translation = [0, y]
+        y += m.episodeName.boundingRect().height
+    end if
+
+    y += MINIMALIST_ACTIONS_GAP
+    m.buttonRow.translation = [0, y]
+
+    m.headline.translation = [0, upperBottom - (y + MINIMALIST_BUTTON_ROW_HEIGHT)]
+    m.aside.translation = [MINIMALIST_HEADLINE_WIDTH + MINIMALIST_ASIDE_GAP, upperBottom - MINIMALIST_STILL_HEIGHT]
+end sub
+
+' The page never scrolls, so there is no offset to keep
+function contentScrollOffset() as integer
+    return 0
+end function
+
+sub applyBackdropTreatment()
+    if not isValid(m.backdropScrim) then return
+
+    m.backdropScrim.opacity = minimalistRules.ScrimOpacity(getBackdropBlurAmount())
+end sub
+
+' Nothing on the page moves, so a Seerr focus has nothing to scroll to
+sub scrollToSeerrFocus()
+end sub
+
+sub onLogoImageURIChanged()
+    if not isValid(m.logoImage) then return
+
+    hasLogo = isValidAndNotEmpty(m.top.logoImageURI)
+    m.logoImage.uri = hasLogo ? m.top.logoImageURI : ""
+
+    m.logoGroup.visible = hasLogo
+    m.titleNode.visible = not hasLogo
+
+    layoutContainer()
+end sub
+
+' ===== Button host hooks =====
+
+sub appendButtonNode(config as object)
+    buttonGroup = detailButtons.createModernButton(config, m.buttonGroups.count())
+    buttonGroup.observeField("focusedChild", "onButtonFocusChanged")
+    m.buttonRow.appendChild(buttonGroup)
+    m.buttonGroups.push(buttonGroup)
+end sub
+
+sub clearButtonRow()
+    if isValid(m.buttonRow) then m.buttonRow.removeChildrenIndex(m.buttonRow.getChildCount(), 0)
+    m.buttonGroups = []
+    m.overflowActions = []
+end sub
+
+sub commitButtonRow()
+    m.overflowActions = []
+
+    ' Kids Mode's row is its own short allow list and always fits, so nothing folds away there.
+    ' A menu would hand back everything the mode meant to put away.
+    if not kidsMode.Enabled() and m.buttonGroups.count() > MINIMALIST_MAX_BUTTONS
+        ' The menu takes the last slot, so one fewer button stays out
+        keep = MINIMALIST_MAX_BUTTONS - 1
+
+        for i = keep to m.buttonGroups.count() - 1
+            button = m.buttonGroups[i]
+            m.overflowActions.push({
+                icon: button.iconUri,
+                label: button.labelText,
+                action: button.buttonAction
+            })
+        end for
+
+        while m.buttonGroups.count() > keep
+            m.buttonRow.removeChild(m.buttonGroups[m.buttonGroups.count() - 1])
+            m.buttonGroups.pop()
+        end while
+
+        appendButtonNode({
+            icon: "pkg:/images/icons/dotDotDot.png",
+            label: tr("More Actions"),
+            action: "toggleMoreActions",
+            id: "moreActionsButton"
+        })
+    end if
+
+    layoutButtonRow(0)
+end sub
+
+' No item type here brings a row of its own, so the host's set stands
+function typeSpecificButtons() as boolean
+    return false
+end function
+
+function markActiveButton(config as object, isActive as boolean, ink as string) as object
+    config.active = isActive
+    if isValid(config.iconUri) then config.icon = config.iconUri
+    if isValidAndNotEmpty(ink) then config.ink = ink
+    return config
+end function
+
+sub setToggleButtonLabel(buttonId as string, label as string, isActive as boolean)
+    for each button in m.buttonGroups
+        if isValid(button) and button.id = buttonId
+            labelNode = button.findNode("btnLabel")
+            if isValid(labelNode) then labelNode.text = label
+            ' The favorite heart tints when the state is active
+            icon = button.findNode("btnIcon")
+            if isValid(icon) then icon.blendColor = isActive ? "#CC3333" : "#FFFFFF"
+        end if
+    end for
+end sub
+
+sub toggleMoreActions()
+    if m.overflowActions.count() = 0 then return
+
+    m.overflowMenu.actions = m.overflowActions
+    m.overflowMenu.visible = true
+    m.overflowMenu.setFocus(true)
+end sub
+
+sub onOverflowAction(event as object)
+    action = event.getData()
+    closeOverflowMenu()
+    if not isValidAndNotEmpty(action) then return
+
+    ' The row no longer holds the button, so the action is dispatched by name the way the host
+    ' would have dispatched it
+    held = m.currentButtonIndex
+    more = m.buttonGroups.count() - 1
+    if more < 0 then return
+
+    standIn = m.buttonGroups[more].buttonAction
+    m.buttonGroups[more].buttonAction = action
+    m.currentButtonIndex = more
+    handleButtonSelect()
+    m.buttonGroups[more].buttonAction = standIn
+    m.currentButtonIndex = held
+end sub
+
+sub onOverflowClosed()
+    closeOverflowMenu()
+end sub
+
+sub closeOverflowMenu()
+    m.overflowMenu.visible = false
+    m.overflowMenu.setFocus(false)
+    focusButton(m.currentButtonIndex)
+end sub
+
+' Minimalist draws no technical row, so there is no summary to build
+sub buildStreamSummary(_itemData as object)
+end sub
+
+sub updatePlayedIndicator()
+    ' No played indicator on this screen
+end sub
+
+sub refreshAfterVersionChange()
+    ' A version swap replaces the whole item payload, so the screen re-reads it
+    m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
+end sub
+
+sub highlightButton(index as integer)
+    detailButtons.highlightModern(index, m.buttonGroups)
+    layoutButtonRow(index)
+end sub
+
+sub unhighlightAllButtons()
+    detailButtons.unhighlightAllModern(m.buttonGroups)
+    layoutButtonRow(-1)
+end sub
+
+sub layoutButtonRow(focusIndex as integer)
+    x = 0
+    for i = 0 to m.buttonGroups.count() - 1
+        button = m.buttonGroups[i]
+        if not isValid(button) then continue for
+
+        button.translation = [x, 0]
+        width = MINIMALIST_BUTTON_WIDTH
+        if i = focusIndex
+            labelNode = button.findNode("btnLabel")
+            if isValid(labelNode) then width = MINIMALIST_BUTTON_WIDTH + labelNode.boundingRect().width + MINIMALIST_BUTTON_LABEL_PAD
+        end if
+        x += width + MINIMALIST_BUTTON_GAP
+    end for
+end sub
+
+sub handleScreenButtonAction(action as string)
+    item = m.top.itemContent
+    if not isValid(item) then return
+
+    if action = "play" or action = "resume"
+        m.global.queueManager.callFunc("clear")
+        m.global.queueManager.callFunc("push", item)
+        m.global.queueManager.callFunc("playQueue")
+    else if action = "favorite"
+        toggleItemFavorite()
+    end if
+end sub
+
+sub toggleItemFavorite()
+    if not isChainValid(m.top.itemContent, "json") then return
+
+    itemData = m.top.itemContent.json
+    newStatus = not chainLookupReturn(itemData, "UserData.IsFavorite", false)
+
+    m.favoriteTask.itemId = itemData.id
+    m.favoriteTask.favTask = newStatus ? "favorite" : "unfavorite"
+    m.favoriteTask.control = TaskControl.RUN
+
+    if not isChainValid(itemData, "UserData")
+        itemData.UserData = { "IsFavorite": newStatus }
+    else
+        itemData.UserData.IsFavorite = newStatus
+    end if
+end sub
+
+function buttonHasFocus() as boolean
+    for each button in m.buttonGroups
+        if isValid(button) and (button.hasFocus() or button.isInFocusChain()) then return true
+    end for
+    return false
+end function
+
+function isSeason() as boolean
+    return LCase(m.top.itemType) = "season"
+end function
+
+' ===== Keys =====
+
+' The flow is one way on purpose: the buttons lead to the tabs, a tab picks the season and the
+' rail follows.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    ' An open menu answers the remote itself
+    if m.overflowMenu.visible then return false
+
+    if m.episodeRail.isInFocusChain()
+        atStop = m.episodeRail.focusedStop
+        if key = KeyCode.LEFT
+            if atStop > 0
+                m.episodeRail.callFunc("focusStop", atStop - 1)
+                return true
+            end if
+            ' The press is swallowed when there is no sidebar to take it, since letting it
+            ' through leaves the card behind with nothing else picking focus up
+            if FocusSidebar(m.top) then m.episodeRail.callFunc("clearFocus")
+            return true
+        else if key = KeyCode.RIGHT
+            if atStop < m.episodeRail.stopCount - 1 then m.episodeRail.callFunc("focusStop", atStop + 1)
+            return true
+        else if key = KeyCode.UP
+            if m.seasonBar.visible
+                focusSeasonBar()
+            else
+                m.episodeRail.callFunc("clearFocus")
+                focusButton(m.currentButtonIndex)
+            end if
+            return true
+        else if key = KeyCode.OK
+            openFocusedEpisode()
+            return true
+        end if
+    else if buttonHasFocus()
+        if key = KeyCode.LEFT
+            if m.currentButtonIndex > 0
+                focusButton(m.currentButtonIndex - 1)
+                return true
+            end if
+            if FocusSidebar(m.top) then unhighlightAllButtons()
+            return true
+        else if key = KeyCode.RIGHT
+            if m.currentButtonIndex < m.buttonGroups.count() - 1 then focusButton(m.currentButtonIndex + 1)
+            return true
+        else if key = KeyCode.DOWN
+            if m.seasonBar.visible
+                focusSeasonBar()
+                return true
+            end if
+            if m.episodeRail.stopCount > 0
+                focusRail()
+                return true
+            end if
+        else if key = KeyCode.UP
+            m.top.lastFocus = m.buttonGroups[m.currentButtonIndex]
+            unhighlightAllButtons()
+            return FocusNav(m.top)
+        else if key = KeyCode.OK
+            handleButtonSelect()
+            return true
+        end if
+    end if
+
+    if key = KeyCode.BACK
+        m.global.sceneManager.callFunc("popScene")
+        return true
+    end if
+
+    return false
+end function

@@ -15,11 +15,11 @@ import "pkg:/source/utils/misc.bs"
 const KIDS_LIBRARY_ROW = "smalllibrarytiles"
 const KIDS_LATEST_ROW = "latestmedia"
 
-' Buttons the mode takes away. A non-admin account never sees the admin one anyway, so those
-' matter when the account handed over is a parent's own. The Seerr buttons open their own dialogs
-' rather than moving to a screen, which puts them out of reach of the screen guard and leaves this
-' set as the only thing holding them back.
-const KIDS_HIDDEN_BUTTONS = ["admin", "artwork", "deleteFiles", "seerrRequest", "seerrRequest4k", "seerrWatchlist", "seerrReportIssue", "seerrManage"]
+' The only buttons the mode offers, alongside the play and restart every details screen puts in
+' front of them. An allow list rather than a block list, so a button added later stays out until
+' someone decides a child should have it. Keeping the row short is half the point, since anything
+' that does not fit folds into a menu, which hands back everything the mode meant to put away.
+const KIDS_BUTTONS = ["shuffle", "favorite"]
 
 ' The guide, the recordings and everything Seerr, named by the screens that draw them
 const BLOCKED_SCENES = ["LiveTVLibraryView", "Schedule", "SeerrDiscoveryScreen", "SeerrRequestsScreen", "SeerrGenreBrowseScreen", "SeerrHubScreen", "SeerrIssueThread", "SeerrSettingsScreen"]
@@ -62,17 +62,39 @@ namespace kidsMode
         return kept
     end function
 
-    ' Filtered before the viewer's own button arrangement is applied, so reordering cannot bring
-    ' one of these back.
+    ' The order here is the order on screen. The saved arrangement belongs to the parent and is
+    ' one of the things the mode sets aside, so it is not consulted.
     function KeepButtons(buttons as object) as object
         if not Enabled() then return buttons
 
         kept = []
-        for each button in buttons
-            if not inArray(KIDS_HIDDEN_BUTTONS, button.id) then kept.push(button)
+        for each id in KIDS_BUTTONS
+            for each button in buttons
+                if button.id = id then kept.push(button)
+            end for
         end for
 
         return kept
+    end function
+
+    ' An outside catalogue is one no parental rating reaches, so recommendations stay inside the
+    ' server's own library. Read rather than written, so turning the mode off gives the viewer
+    ' their own choice back and nothing forced reaches the settings the plugin syncs.
+    function RecommendationSource(chosen as string) as string
+        return Enabled() ? "local" : chosen
+    end function
+
+    ' The stripped back screen, which the mode always shows. Everything else the mode would set
+    ' aside on a details screen, the technical row, the description and the expanded tabs, is
+    ' something Minimalist never draws, so the style is the only choice left to force.
+    function DetailStyle(chosen as string) as string
+        return Enabled() ? "minimalist" : chosen
+    end function
+
+    ' A still says which part of a show this is, and a child picking an episode has little else to
+    ' go on, so the setting that swaps every one of them for the show's own artwork is set aside.
+    function SeriesThumbnails(chosen as boolean) as boolean
+        return Enabled() ? false : chosen
     end function
 
     ' Screens the mode refuses to open. Hiding a way in is presentation, and a home row, a search

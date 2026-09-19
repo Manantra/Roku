@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="MinimalistItemDetails" extends="JFScreen">
+    <children>
+        <Rectangle id="backdropBlack" width="1920" height="1080" color="#0B0D10" />
+        <Poster id="backdrop" width="1920" height="1080" loadDisplayMode="scaleToFill" />
+        <!-- A flat wash rather than the gradients the other styles lay under their text,
+            since here the title and the buttons sit straight on the picture -->
+        <Rectangle id="backdropScrim" width="1920" height="1080" color="#000000" opacity="0.6" />
+
+        <!-- Everything is anchored to the bottom. Nothing competes for the upper half,
+            which is where the picture is -->
+        <Group id="content">
+            <Group id="headline">
+                <Group id="logoGroup" visible="false">
+                    <Poster id="logoImage" loadDisplayMode="scaleToFit" width="340" height="160" />
+                </Group>
+                <Label id="title" wrap="true" maxLines="2" color="#FFFFFF" />
+                <Label id="episodeName" wrap="true" maxLines="2" color="#FFFFFF" visible="false" />
+                <Group id="buttonRow" />
+            </Group>
+
+            <!-- The episode still, in the room the artwork was using. The backdrop behind it
+                is the whole show and says nothing about which part of it you are on -->
+            <Group id="aside" visible="false">
+                <MaskGroup id="stillMask" maskUri="pkg:/images/details/thumb_mask.png">
+                    <Rectangle id="stillBg" color="#FFFFFF" opacity="0.06" />
+                    <Poster id="stillImage" loadDisplayMode="scaleToZoom" />
+                </MaskGroup>
+            </Group>
+
+            <!-- The tabs name the season, so the rail under them goes without a heading of
+                its own -->
+            <Group id="episodes" visible="false">
+                <DetailTabBar id="seasonBar" visible="false" />
+                <NouveauRail id="episodeRail" />
+            </Group>
+        </Group>
+
+        <NouveauOverflowMenu id="overflowMenu" visible="false" />
+
+        <AudioSelector id="audioSelector" visible="false" />
+        <SubtitleSelector id="subtitleSelector" visible="false" />
+        <SubtitleDownloadDialog id="subtitleDownloadDialog" visible="false" />
+        <VersionSelector id="versionSelector" visible="false" />
+        <ThemeMusicPlayer id="themeMusicPlayer" />
+        <FavoriteItemsTask id="favoriteTask" />
+        <PlaystateTask id="playstateTask" />
+    </children>
+    <interface>
+        <field id="seerrButtonsStale" type="boolean" alwaysNotify="true" />
+        <field id="buttonSelected" type="string" alwaysNotify="true" />
+        <field id="studioSelected" type="assocarray" alwaysNotify="true" />
+        <field id="selectedItem" type="node" alwaysNotify="true" />
+        <field id="itemContent" type="node" />
+        <field id="seerrTarget" type="assocarray" onChange="onSeerrTargetChanged" />
+        <field id="seerrOnly" type="boolean" value="false" />
+        <field id="itemType" type="string" value="movie" />
+        <field id="trailerAvailable" type="bool" value="false" />
+        <field id="selectedPart" type="assocarray" onChange="onSelectedPartChanged" />
+        <field id="selectedAudioStreamIndex" type="integer" />
+        <field id="selectedVideoStreamId" type="string" />
+        <field id="quickPlayNode" type="node" alwaysNotify="true" />
+        <field id="refreshMovieDetailsData" type="bool" alwaysNotify="true" />
+        <field id="refreshEpisodeDetailsData" type="bool" alwaysNotify="true" />
+        <field id="refreshSeriesDetailsData" type="bool" alwaysNotify="true" />
+        <field id="logoImageURI" type="string" onChange="onLogoImageURIChanged" />
+        <field id="seasonData" type="node" />
+        <field id="pageContent" type="node" />
+        <field id="albumData" type="node" />
+        <field id="listData" type="node" />
+        <field id="playAlbumSelected" type="bool" alwaysNotify="true" />
+        <field id="shuffleAlbumSelected" type="bool" alwaysNotify="true" />
+        <field id="instantMixSelected" type="bool" alwaysNotify="true" />
+        <field id="playSong" type="integer" alwaysNotify="true" />
+        <field id="playAll" type="bool" alwaysNotify="true" />
+        <field id="playArtistSelected" type="bool" alwaysNotify="true" />
+        <field id="selectedAlbum" type="node" alwaysNotify="true" />
+        <field id="playlistItemSelected" type="integer" alwaysNotify="true" />
+        <field id="displayResumeButton" type="bool" onChange="onDisplayResumeButtonChange" />
+        <field id="shufflePlay" type="bool" value="false" />
+        <field id="playSeasonFromStart" type="bool" alwaysNotify="true" />
+        <field id="refreshSeasonDetailsData" type="bool" alwaysNotify="true" />
+        <field id="seasonSelected" type="node" alwaysNotify="true" />
+        <field id="playSeriesFromStart" type="bool" alwaysNotify="true" />
+        <field id="seasonEpisodesData" type="assocarray" onChange="onSeasonEpisodesLoaded" />
+    </interface>
+</component>

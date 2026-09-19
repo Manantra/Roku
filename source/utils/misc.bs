@@ -1369,6 +1369,7 @@ function normalizeDetailScreenStyleToken(value as dynamic) as string
     if token = "classic" or token = "v1" then return "classic"
     if token = "spotlight" or token = "v3" then return "spotlight"
     if token = "nouveau" or token = "v4" then return "nouveau"
+    if token = "minimalist" or token = "v5" then return "minimalist"
     if token = "modern" or token = "v2" then return "modern"
 
     return "modern"
