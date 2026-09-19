@@ -8,7 +8,8 @@ import "pkg:/source/utils/misc.bs"
 ' Nothing here throws. A server without the plugin answers 404 on every route, and a panel that
 ' asked for everything at once and got nothing back wants an empty screen rather than a pile of
 ' errors, so a failed call reads as no answer. Nothing here polls, and the login ping, the quest
-' reroll, spending a power-up and buying one are the only writes.
+' reroll, spending a power-up, buying one and changing what the profile wears are the only
+' writes.
 
 const ACHIEVEMENTS_ROOT = "/Plugins/AchievementBadges"
 ' What the panel opens on, so the screen that can change it knows what it was handed
@@ -78,7 +79,9 @@ namespace achievements
         started = diagnostics.StartTrace("POST", req)
         req.SetRequest("POST")
         req.setMessagePort(CreateObject("roMessagePort"))
-        req.AddHeader("Content-Type", "application/json")
+        ' A write with nothing to send says nothing about its content either, since a route that
+        ' takes no body answers 415 to a request that claims to carry JSON
+        if isValid(sent) then req.AddHeader("Content-Type", "application/json")
         req.AsyncPostFromString(isValid(sent) ? FormatJson(sent) : "")
 
         event = wait(30000, req.GetMessagePort())
@@ -176,6 +179,43 @@ namespace achievements
         return achievementsModel.ParseActivityFeed(json)
     end function
 
+    ' What the profile owns and wears. Without the catalogue an equipped id names nothing, so a
+    ' server that answered without one leaves the profile with nothing to wear.
+    function FetchCosmetics() as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return {}
+
+        catalog = achievementsModel.ParseCosmeticCatalog(GetMap("shop/catalog"))
+        if catalog.count() = 0 then return {}
+
+        return achievementsModel.BuildCosmeticLoadout(catalog, GetMap(`users/${userId}/cosmetics`))
+    end function
+
+    ' Wears one, which the plugin refuses with 400 when the profile does not own it
+    function EquipCosmetic(id as string) as object
+        return Wear("cosmetics/equip", { CosmeticId: id })
+    end function
+
+    ' Empties whatever the given kind fills. This one takes its kind on the query rather than in
+    ' a body.
+    function UnequipCosmetic(kind as string) as object
+        return Wear(`cosmetics/unequip?kind=${kind}`, invalid)
+    end function
+
+    function Wear(path as string, sent as dynamic) as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        if not isValidAndNotEmpty(userId) then return { outcome: COSMETIC_FAILED }
+
+        written = Post(`users/${userId}/${path}`, 400, sent)
+
+        if written.refused = true then return { outcome: COSMETIC_REFUSED, message: written.message }
+        ' Both routes answer with an object, so nothing back is a fault rather than a change that
+        ' took
+        if not achievementsModel.IsObject(written.body) then return { outcome: COSMETIC_FAILED }
+
+        return { outcome: COSMETIC_CHANGED }
+    end function
+
     ' What the shop sells, narrowed to the power-ups. The catalogue is the same for everyone, so
     ' this route carries no user.
     function FetchShopPowerUps() as object
@@ -263,6 +303,7 @@ namespace achievements
             leaderboard: leaderboard,
             recap: achievementsModel.ParseRecap(GetMap(`users/${userId}/recap`, { period: ACHIEVEMENTS_DEFAULT_PERIOD })),
             libraryCompletion: achievementsModel.ParseLibraryCompletion(GetMap(`users/${userId}/library-completion`)),
+            cosmetics: FetchCosmetics(),
             leaderboardEnabled: config.leaderboardEnabled,
             questsEnabled: config.questsEnabled,
             activityEnabled: config.activityEnabled

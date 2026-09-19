@@ -39,6 +39,15 @@
         <translation>And plenty more</translation>
     </message>
     <message>
+        <source>Appearance</source>
+        <extracomment>The screen for picking an avatar and a title</extracomment>
+        <translation>Appearance</translation>
+    </message>
+    <message>
+        <source>Avatars</source>
+        <translation>Avatars</translation>
+    </message>
+    <message>
         <source>Aya</source>
         <translation>Aya</translation>
     </message>
@@ -138,6 +147,10 @@
         <translation>Could not buy that.</translation>
     </message>
     <message>
+        <source>Could not change how the profile looks.</source>
+        <translation>Could not change how the profile looks.</translation>
+    </message>
+    <message>
         <source>Could not load your achievements.</source>
         <translation>Could not load your achievements.</translation>
     </message>
@@ -218,6 +231,11 @@
     <message>
         <source>Enter Configuration</source>
         <translation>Enter Configuration</translation>
+    </message>
+    <message>
+        <source>Equipped</source>
+        <extracomment>Shown on the avatar or title the profile wears</extracomment>
+        <translation>Equipped</translation>
     </message>
     <message>
         <source>Failed to load</source>
@@ -442,6 +460,11 @@
         <translation>Other</translation>
     </message>
     <message>
+        <source>Owned</source>
+        <extracomment>Shown on an avatar or title the profile holds but is not wearing</extracomment>
+        <translation>Owned</translation>
+    </message>
+    <message>
         <source>Pick a look</source>
         <translation>Pick a look</translation>
     </message>
@@ -615,6 +638,15 @@
     <message>
         <source>Subtitles</source>
         <translation>Subtitles</translation>
+    </message>
+    <message>
+        <source>The avatar and title on your profile</source>
+        <translation>The avatar and title on your profile</translation>
+    </message>
+    <message>
+        <source>Titles</source>
+        <extracomment>Names a profile can wear in place of its rank</extracomment>
+        <translation>Titles</translation>
     </message>
     <message>
         <source>Your records and how the server is doing</source>
@@ -3169,6 +3201,11 @@
         <source>{0} points</source>
         <extracomment>The score a rank tier was reached with</extracomment>
         <translation>{0} points</translation>
+    </message>
+    <message>
+        <source>Earned at {0} lifetime score</source>
+        <extracomment>What an avatar or title costs in score earned over time, rather than in score spent</extracomment>
+        <translation>Earned at {0} lifetime score</translation>
     </message>
     <message>
         <source>{0} favorites sorted by {1}</source>

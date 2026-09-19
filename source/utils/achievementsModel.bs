@@ -22,6 +22,17 @@ const PURCHASE_BOUGHT = "bought"
 const PURCHASE_REFUSED = "refused"
 const PURCHASE_FAILED = "failed"
 
+' How a change to what the profile wears ended.
+const COSMETIC_CHANGED = "changed"
+const COSMETIC_REFUSED = "refused"
+const COSMETIC_FAILED = "failed"
+
+' The plugin sells six kinds of cosmetic. These two are the ones whose entry carries an icon name
+' and a title, so they are the two that can be drawn here. The other four name CSS rules only the
+' plugin's own page ships, and selling those would equip something nobody could see.
+const COSMETIC_AVATAR = "Avatar"
+const COSMETIC_RANK_TITLE = "RankTitle"
+
 namespace achievementsModel
 
     function IsObject(value as dynamic) as boolean
@@ -304,6 +315,151 @@ namespace achievementsModel
             bank: AsInt(Field(json, "ScoreBank")),
             slots: ParsePowerUpSlots(Field(json, "Inventory"))
         }
+    end function
+
+    ' Closer icons than the ones the catalogue carries. The plugin picks its icons for its own
+    ' page and gives several cosmetics the same one, so a crown, a unicorn and a tastemaker all
+    ' arrive as plain sparkles. An id missing from here keeps whatever the server sent, which is
+    ' what anything added in a later release will do.
+    function CloserIcon(id as string, sent as string) as string
+        closer = {
+            "avatar-clapper": "movie_creation",
+            "avatar-crown": "crown",
+            "avatar-dragon": "whatshot",
+            "avatar-owl": "owl",
+            "avatar-popcorn": "fastfood",
+            "avatar-unicorn": "auto_fix_high",
+            "title-archivist": "archive",
+            "title-tastemaker": "trending_up"
+        }
+
+        if closer.doesExist(id) then return closer[id]
+        return sent
+    end function
+
+    ' One avatar or rank title a profile can wear. The name is English the way the catalogue
+    ' writes it, since a release can add more and there is nothing fixed here to translate.
+    function ParseCosmetic(json as object) as object
+        id = AsString(Field(json, "Id"))
+        ' Lifetime score earns it instead of buying it, and is left at nothing on anything that
+        ' is only ever bought
+        milestoneScore = AsInt(Field(json, "MilestoneScore"))
+        priceScore = AsInt(Field(json, "PriceScore"))
+
+        return {
+            id: id,
+            kind: AsString(Field(json, "Kind")),
+            name: AsString(Field(json, "DisplayName")),
+            icon: CloserIcon(id, AsString(Field(json, "PreviewIcon"))),
+            priceScore: priceScore,
+            milestoneScore: milestoneScore,
+            isEarned: milestoneScore > 0,
+            ' Free to everyone, so it is the slot's starting look rather than stock
+            isDefault: priceScore = 0 and milestoneScore = 0
+        }
+    end function
+
+    function ParseCosmeticCatalog(json as dynamic) as object
+        out = []
+        entries = Field(json, "Cosmetics")
+        if not isValidAndNotEmpty(entries) then return out
+
+        for each entry in entries
+            if not IsObject(entry) then continue for
+
+            kind = AsString(Field(entry, "Kind"))
+            if kind = COSMETIC_AVATAR or kind = COSMETIC_RANK_TITLE then out.push(ParseCosmetic(entry))
+        end for
+        return out
+    end function
+
+    ' Joins the catalogue to a profile's state, which is missing entirely until the plugin has a
+    ' profile to hold it.
+    function BuildCosmeticLoadout(catalog as object, state as dynamic) as object
+        loadout = {
+            avatars: [],
+            titles: [],
+            ' The plugin fills in the free ones and any milestone the score has passed, so this is
+            ' the whole answer rather than a list to add the defaults to
+            owned: [],
+            avatarId: AsString(Field(state, "EquippedAvatarId")),
+            titleId: AsString(Field(state, "EquippedCustomTitleId")),
+            ' What a milestone measures against, which is not the bank, only what is left unspent
+            lifetimeScore: AsInt(Field(state, "LifetimeScore")),
+            bank: AsInt(Field(state, "ScoreBank"))
+        }
+
+        for each item in catalog
+            if item.kind = COSMETIC_AVATAR
+                loadout.avatars.push(item)
+            else
+                loadout.titles.push(item)
+            end if
+        end for
+
+        held = Field(state, "Owned")
+        if isValidAndNotEmpty(held)
+            for each id in held
+                text = AsString(id)
+                if text <> "" then loadout.owned.push(text)
+            end for
+        end if
+
+        return loadout
+    end function
+
+    function CosmeticsOf(loadout as object, kind as string) as object
+        return kind = COSMETIC_AVATAR ? loadout.avatars : loadout.titles
+    end function
+
+    function EquippedCosmetic(loadout as object, kind as string) as string
+        return kind = COSMETIC_AVATAR ? loadout.avatarId : loadout.titleId
+    end function
+
+    function OwnsCosmetic(loadout as object, item as object) as boolean
+        if item.isDefault then return true
+
+        for each id in loadout.owned
+            if id = item.id then return true
+        end for
+        return false
+    end function
+
+    ' A loadout the server answered with, rather than the nothing it sends when it has no
+    ' catalogue for the panel to join a profile to
+    function HasCosmetics(loadout as dynamic) as boolean
+        return IsObject(loadout) and isValid(loadout.avatars)
+    end function
+
+    ' Whatever fills one slot, or nothing when the slot is empty or there is no catalogue
+    function WornCosmetic(loadout as dynamic, kind as string) as dynamic
+        if not HasCosmetics(loadout) then return invalid
+
+        id = EquippedCosmetic(loadout, kind)
+        if id = "" then return invalid
+
+        for each item in CosmeticsOf(loadout, kind)
+            if item.id = id then return item
+        end for
+        return invalid
+    end function
+
+    ' The icon the rank header draws, or nothing to keep the tier's own
+    function WornAvatarIcon(loadout as dynamic) as string
+        item = WornCosmetic(loadout, COSMETIC_AVATAR)
+        return isValid(item) ? item.icon : ""
+    end function
+
+    ' The name that stands in for the tier's, or nothing to keep it
+    function WornTitle(loadout as dynamic) as string
+        item = WornCosmetic(loadout, COSMETIC_RANK_TITLE)
+        return isValid(item) ? item.name : ""
+    end function
+
+    function CosmeticsAreEmpty(loadout as dynamic) as boolean
+        if not HasCosmetics(loadout) then return true
+
+        return loadout.avatars.count() = 0 and loadout.titles.count() = 0
     end function
 
     ' Counters keyed the way the plugin names them, such as BestWatchStreak. Keeping the map

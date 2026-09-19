@@ -31,6 +31,7 @@
 
         <!-- Rarity over points on a badge, the reward on a quest, one figure on a board -->
         <Label id="trailingTop" horizAlign="right" font="font:SmallestSystemFont" visible="false" />
+        <Poster id="trailingIcon" width="30" height="30" visible="false" />
         <Label id="trailingBottom" horizAlign="right" font="font:SmallestSystemFont"
             color="#FFFFFFB3" visible="false" />
     </children>

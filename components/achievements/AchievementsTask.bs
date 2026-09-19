@@ -2,8 +2,9 @@ import "pkg:/source/api/Achievements.bs"
 import "pkg:/source/utils/misc.bs"
 
 ' The panel asks for everything at once when it opens, and the leaderboard, the recap, a badge,
-' the activity feed, the stats, the loadout, the shop and what the viewer spends ask again as they
-' work. All of it goes over the network, so none of it runs on the render thread.
+' the activity feed, the stats, the loadout, the shop, the appearance and what the viewer spends
+' or wears ask again as they work. All of it goes over the network, so none of it runs on the
+' render thread.
 
 sub init()
     m.top.functionName = "loadAchievements"
@@ -35,6 +36,17 @@ sub loadAchievements()
 
     if kind = "stats"
         m.top.result = { kind: kind, stats: achievements.FetchStats() }
+        return
+    end if
+
+    if kind = "cosmetics"
+        m.top.result = { kind: kind, cosmetics: achievements.FetchCosmetics() }
+        return
+    end if
+
+    if kind = "wear"
+        wear = request.worn ? achievements.UnequipCosmetic(request.cosmeticKind) : achievements.EquipCosmetic(request.cosmeticId)
+        m.top.result = { kind: kind, worn: request.worn, cosmeticId: request.cosmeticId, cosmeticKind: request.cosmeticKind, wear: wear }
         return
     end if
 

@@ -70,6 +70,7 @@ sub init()
     m.skipHeadingTimer.observeField("fire", "onSkipHeadingTimer")
     m.lastFocusIndex = 0
     m.pendingFocusIndex = -1
+    m.restoringFocus = false
 
     m.message = m.top.findNode("message")
     m.retryButton = m.top.findNode("retryButton")
@@ -101,6 +102,8 @@ sub init()
     m.chase = invalid
     m.activity = []
     m.stats = invalid
+    m.cosmetics = invalid
+    m.cosmeticKind = COSMETIC_AVATAR
     m.powerUps = invalid
     m.shopItems = []
     m.shopBank = 0
@@ -126,7 +129,7 @@ end sub
 sub startLoad(request as object)
     ' A reroll, a spend or a purchase answers one row, so the list stays on screen rather than
     ' blanking to a spinner
-    m.loading = request.kind <> "reroll" and request.kind <> "usePowerUp" and request.kind <> "buy"
+    m.loading = request.kind <> "reroll" and request.kind <> "usePowerUp" and request.kind <> "buy" and request.kind <> "wear"
     render()
     m.loadTask.control = TaskControl.STOP
     m.loadTask.request = request
@@ -146,6 +149,10 @@ sub onLoadResult(event as object)
         m.activity = result.activity
     else if result.kind = "stats"
         m.stats = result.stats
+    else if result.kind = "cosmetics"
+        m.cosmetics = result.cosmetics.count() > 0 ? result.cosmetics : invalid
+    else if result.kind = "wear"
+        applyWear(result)
     else if result.kind = "powerups"
         m.powerUps = result.powerUps
     else if result.kind = "shop"
@@ -231,6 +238,13 @@ sub render()
         m.rows = activityRows()
     else if m.view = "stats"
         m.rows = statsRows()
+    else if m.view = "appearance"
+        if not m.loading and not isValid(m.cosmetics)
+            showLoadFailed("cosmetics")
+            return
+        end if
+        showTabs(cosmeticKinds(), [tr("Avatars"), tr("Titles")], m.cosmeticKind)
+        m.rows = appearanceRows()
     else if m.view = "loadout"
         if not m.loading and not isValid(m.powerUps)
             showLoadFailed("powerups")
@@ -275,6 +289,7 @@ function breadcrumb() as string
     if m.view = "stats" then return `${title} / ${tr("Stats")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
     if m.view = "loadout" then return `${title} / ${tr("Loadout")}`
+    if m.view = "appearance" then return `${title} / ${tr("Appearance")}`
     if m.view = "shop" then return `${title} / ${tr("Loadout")} / ${tr("Shop")}`
     if m.view = "library" then return `${title} / ${tr("Library completion")}`
     return title
@@ -364,9 +379,12 @@ sub drawRankHeader()
 
         m.rankFill.blendColor = themeChrome.WithAlpha(color, "2E")
         m.rankBorder.blendColor = themeChrome.WithAlpha(color, "73")
-        m.rankIcon.uri = achievementsIcons.PathFor(rank.tier.icon)
+        ' What the profile wears stands in for the tier's own look
+        avatar = achievementsModel.WornAvatarIcon(m.overview.cosmetics)
+        worn = achievementsModel.WornTitle(m.overview.cosmetics)
+        m.rankIcon.uri = achievementsIcons.PathFor(avatar <> "" ? avatar : rank.tier.icon)
         m.rankIcon.blendColor = themeChrome.WithAlpha(color, "FF")
-        m.rankName.text = rank.tier.name
+        m.rankName.text = worn <> "" ? worn : rank.tier.name
         m.rankScore.text = substitute(tr("{0} points"), rank.score.toStr())
         m.rankRow.translation = [0, y]
         y += ACHIEVEMENT_RANK_AVATAR + ACHIEVEMENT_RANK_ROW_GAP
@@ -583,6 +601,10 @@ function overviewRows() as object
     rows.push(navRow("recap", tr("Recap"), tr("What you watched recently"), "insights", true))
 
     rows.push(navRow("loadout", tr("Loadout"), tr("Score to spend and the boosts you hold"), "backpack", true))
+
+    if not achievementsModel.CosmeticsAreEmpty(m.overview.cosmetics)
+        rows.push(navRow("appearance", tr("Appearance"), tr("The avatar and title on your profile"), "face_5", true))
+    end if
 
     libraries = m.overview.libraryCompletion.count()
     if libraries > 0
@@ -987,6 +1009,108 @@ function serverRows() as object
     return rows
 end function
 
+function cosmeticKinds() as object
+    return [COSMETIC_AVATAR, COSMETIC_RANK_TITLE]
+end function
+
+function appearanceRows() as object
+    rows = []
+    if not isValid(m.cosmetics) then return rows
+
+    rows.push(scoreBankRow(m.cosmetics.bank))
+    for each item in achievementsModel.CosmeticsOf(m.cosmetics, m.cosmeticKind)
+        rows.push(cosmeticRow(item))
+    end for
+
+    if m.spendProblem <> "" then rows.push(noteRow(m.spendProblem))
+
+    return rows
+end function
+
+' One avatar or title, and whichever of wearing or buying it allows. There is nothing to do with
+' one that has to be earned and has not been, or one the bank is short of. It is never dimmed,
+' since whatever blocks a press already shows in the row as a price or the score still needed.
+function cosmeticRow(item as object) as object
+    wearing = achievementsModel.EquippedCosmetic(m.cosmetics, item.kind) = item.id
+    held = achievementsModel.OwnsCosmetic(m.cosmetics, item)
+    affordable = item.priceScore <= m.cosmetics.bank
+
+    row = {
+        kind: "cosmetic",
+        cosmeticId: item.id,
+        cosmeticKind: item.kind,
+        worn: wearing,
+        held: held,
+        offered: not m.spendBusy and (held or (not item.isEarned and affordable)),
+        title: item.name,
+        icon: item.icon,
+        tint: m.accent,
+        height: 150
+    }
+
+    if wearing
+        row.progressText = tr("Equipped")
+        row.progressColor = m.accent
+        row.trailingIcon = "check_circle"
+    else if held
+        row.progressText = tr("Owned")
+    else if item.isEarned
+        row.caption = substitute(tr("Earned at {0} lifetime score"), item.milestoneScore.toStr())
+        row.showBar = true
+        row.barValue = achievementsModel.Clamp(m.cosmetics.lifetimeScore / item.milestoneScore)
+        row.barColor = m.accent
+    else
+        row.trailingTop = substitute(tr("{0} points"), item.priceScore.toStr())
+        row.trailingColor = affordable ? m.accent : "#FFFFFFB3"
+    end if
+
+    return row
+end function
+
+' Puts one on, or takes it off when it is already the one worn
+sub wearCosmetic(row as object)
+    m.spendIndex = m.rowList.itemFocused
+    m.spendBusy = true
+    m.spendProblem = ""
+    render()
+    focusRow(m.spendIndex)
+
+    startLoad({ kind: "wear", worn: row.worn, cosmeticId: row.cosmeticId, cosmeticKind: row.cosmeticKind })
+end sub
+
+sub applyWear(result as object)
+    m.spendBusy = false
+    wear = result.wear
+
+    if wear.outcome <> COSMETIC_CHANGED
+        m.spendProblem = tr("Could not change how the profile looks.")
+        if wear.outcome = COSMETIC_REFUSED and isValidAndNotEmpty(wear.message) then m.spendProblem = wear.message
+        return
+    end if
+
+    ' The answer carries the row it was given back, so the slot it fills is still known after the
+    ' trip even if the viewer has moved to the other tab
+    slot = result.worn ? "" : result.cosmeticId
+    if result.cosmeticKind = COSMETIC_AVATAR
+        m.cosmetics.avatarId = slot
+    else
+        m.cosmetics.titleId = slot
+    end if
+
+    ' The rank header behind this screen is drawn from what the profile wears, so it takes the
+    ' same answer rather than asking for the whole panel again
+    m.overview.cosmetics = m.cosmetics
+end sub
+
+sub openAppearance()
+    m.cosmetics = invalid
+    m.cosmeticKind = COSMETIC_AVATAR
+    m.spendProblem = ""
+    m.loading = true
+    pushView("appearance")
+    startLoad({ kind: "cosmetics" })
+end sub
+
 sub openStats()
     m.stats = invalid
     m.loading = true
@@ -1302,6 +1426,12 @@ sub applyPurchase(result as object)
     m.spendBusy = false
     if result.outcome = PURCHASE_BOUGHT
         if result.bankAfter >= 0 then m.shopBank = result.bankAfter
+        ' The shop and the appearance screen buy through the same route, so one bought from the
+        ' appearance screen is added to what the profile owns here
+        if m.view = "appearance"
+            m.cosmetics.owned.push(m.shopItemId)
+            if result.bankAfter >= 0 then m.cosmetics.bank = result.bankAfter
+        end if
         return
     end if
 
@@ -1371,6 +1501,14 @@ sub onTabActivated()
         return
     end if
 
+    if m.view = "appearance"
+        kinds = cosmeticKinds()
+        if index >= kinds.count() then return
+        m.cosmeticKind = kinds[index]
+        render()
+        return
+    end if
+
     if m.view = "recap"
         periods = recapPeriods()
         if index >= periods.count() then return
@@ -1396,11 +1534,21 @@ sub onRowFocused()
     if focused < 0 or focused >= m.rows.count() then return
 
     if isFocusStop(m.rows[focused])
+        m.restoringFocus = false
         m.lastFocusIndex = focused
         return
     end if
 
     direction = focused >= m.lastFocusIndex ? 1 : -1
+
+    ' The list keeps UP for itself while it has a row above, so a screen that opens on a heading
+    ' hands the cursor to the tabs from here. A list still on its way to the row the screen asked
+    ' for is passing through rather than being walked up.
+    if direction = -1 and not m.restoringFocus and m.tabBar.visible and not stopsAbove(focused)
+        m.tabBar.setFocus(true)
+        return
+    end if
+
     target = focused + direction
     while target >= 0 and target < m.rows.count() and not isFocusStop(m.rows[target])
         target += direction
@@ -1419,6 +1567,15 @@ function isFocusStop(row as object) as boolean
     return row.kind <> "heading" and row.kind <> "clock"
 end function
 
+' Whether any row above this one can take the cursor
+function stopsAbove(index as integer) as boolean
+    for i = 0 to index - 1
+        if isFocusStop(m.rows[i]) then return true
+    end for
+
+    return false
+end function
+
 ' Puts the cursor back on a row after the list is built again. The list focuses its first row
 ' as soon as it has content, and that row is a heading, so the skip it queued is dropped first
 sub focusRow(index as integer)
@@ -1426,6 +1583,7 @@ sub focusRow(index as integer)
 
     m.skipHeadingTimer.control = "stop"
     m.pendingFocusIndex = -1
+    m.restoringFocus = true
     m.lastFocusIndex = index
     m.rowList.jumpToItem = index
 end sub
@@ -1435,6 +1593,7 @@ sub onSkipHeadingTimer()
 
     target = m.pendingFocusIndex
     m.pendingFocusIndex = -1
+    m.restoringFocus = false
     m.lastFocusIndex = target
     m.rowList.jumpToItem = target
 end sub
@@ -1449,6 +1608,8 @@ sub onRowSelected()
             openActivity()
         else if row.view = "stats"
             openStats()
+        else if row.view = "appearance"
+            openAppearance()
         else if row.view = "loadout"
             openLoadout()
         else if row.view = "shop"
@@ -1476,6 +1637,16 @@ sub onRowSelected()
 
     if row.kind = "shop"
         if row.offered then askBuy(row.itemId)
+        return
+    end if
+
+    if row.kind = "cosmetic"
+        if not row.offered then return
+        if row.held
+            wearCosmetic(row)
+        else
+            askBuy(row.cosmeticId)
+        end if
         return
     end if
 
