@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="SetupDetailPreview" extends="Group">
   <interface>
-    <field id="modern" type="boolean" value="false" />
+    <field id="variant" type="string" value="modern" />
     <field id="items" type="array" onChange="redraw" />
   </interface>
 </component>

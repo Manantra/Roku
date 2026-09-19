@@ -44,6 +44,14 @@
         <translation>Appearance</translation>
     </message>
     <message>
+        <source>Artwork first, with cards that open what they name.</source>
+        <translation>Artwork first, with cards that open what they name.</translation>
+    </message>
+    <message>
+        <source>Artwork, one play button and the episodes.</source>
+        <translation>Artwork, one play button and the episodes.</translation>
+    </message>
+    <message>
         <source>Avatars</source>
         <translation>Avatars</translation>
     </message>
@@ -242,6 +250,10 @@
         <translation>Equipped</translation>
     </message>
     <message>
+        <source>Every section stacked down one page.</source>
+        <translation>Every section stacked down one page.</translation>
+    </message>
+    <message>
         <source>Exit Kids Mode</source>
         <translation>Exit Kids Mode</translation>
     </message>
@@ -404,6 +416,10 @@
         <translation>Messages</translation>
     </message>
     <message>
+        <source>Minimalist</source>
+        <translation>Minimalist</translation>
+    </message>
+    <message>
         <source>Modern</source>
         <translation>Modern</translation>
     </message>
@@ -454,6 +470,10 @@
     <message>
         <source>None held</source>
         <translation>None held</translation>
+    </message>
+    <message>
+        <source>Nouveau</source>
+        <translation>Nouveau</translation>
     </message>
     <message>
         <source>Off</source>
@@ -638,6 +658,10 @@
         <source>Specials</source>
         <extracomment>Labels season zero, where a server keeps specials</extracomment>
         <translation>Specials</translation>
+    </message>
+    <message>
+        <source>Spotlight</source>
+        <translation>Spotlight</translation>
     </message>
     <message>
         <source>Stats</source>

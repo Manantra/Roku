@@ -125,17 +125,14 @@ end function
 ' The held answer when there is one, the current setting otherwise, which
 ' always exists because the defaults are merged into the session at load.
 ' Another client can have stored the detail style in its own spelling, so
-' both are read
+' the token is brought back to the one the cards carry
 function effectiveValue(stepName as string) as string
     key = rokuKeyFor(stepName)
     if key = "" then return ""
     held = m.answers[key]
     if isValidAndNotEmpty(held) then return held
     current = toString(m.global.session.user.settings[key])
-    if isStringEqual(stepName, "detailStyle")
-        if isStringEqual(current, "v1") then return "classic"
-        if isStringEqual(current, "v2") then return "modern"
-    end if
+    if isStringEqual(stepName, "detailStyle") then return normalizeDetailScreenStyleToken(current)
     return current
 end function
 
@@ -160,8 +157,11 @@ function stepConfigs(stepName as string) as object
         ]
     end if
     return [
-        { value: "classic", label: tr("Classic"), hint: tr("All the details on one page."), previewComponent: "SetupDetailPreview", previewFields: { modern: false } },
-        { value: "modern", label: tr("Modern"), hint: tr("Cinematic, with tabs for cast and extras."), previewComponent: "SetupDetailPreview", previewFields: { modern: true } }
+        { value: "classic", label: tr("Classic"), hint: tr("All the details on one page."), previewComponent: "SetupDetailPreview", previewFields: { variant: "classic" } },
+        { value: "modern", label: tr("Modern"), hint: tr("Cinematic, with tabs for cast and extras."), previewComponent: "SetupDetailPreview", previewFields: { variant: "modern" } },
+        { value: "spotlight", label: tr("Spotlight"), hint: tr("Artwork first, with cards that open what they name."), previewComponent: "SetupDetailPreview", previewFields: { variant: "spotlight" } },
+        { value: "nouveau", label: tr("Nouveau"), hint: tr("Every section stacked down one page."), previewComponent: "SetupDetailPreview", previewFields: { variant: "nouveau" } },
+        { value: "minimalist", label: tr("Minimalist"), hint: tr("Artwork, one play button and the episodes."), previewComponent: "SetupDetailPreview", previewFields: { variant: "minimalist" } }
     ]
 end function
 
@@ -206,7 +206,7 @@ sub buildCards(stepName as string)
     effective = effectiveValue(stepName)
     m.cardIndex = 0
 
-    if configs.count() > 4
+    if configs.count() > 5
         previewWidth = 384
         previewHeight = 216
         columns = 4
@@ -215,12 +215,15 @@ sub buildCards(stepName as string)
         strideX = previewWidth + 32
         strideY = 302
     else
-        previewWidth = 720
-        previewHeight = 405
+        ' One row across, with the previews shrunk when there are enough of them to need it
+        roomy = configs.count() < 5
+        previewWidth = roomy ? 720 : 336
+        previewHeight = roomy ? 405 : 189
+        gap = roomy ? 48 : 32
         columns = configs.count()
-        x0 = (1920 - configs.count() * 720 - (configs.count() - 1) * 48) / 2
-        y0 = 280
-        strideX = previewWidth + 48
+        x0 = (1920 - configs.count() * previewWidth - (configs.count() - 1) * gap) / 2
+        y0 = roomy ? 280 : 340
+        strideX = previewWidth + gap
         strideY = 0
     end if
 
