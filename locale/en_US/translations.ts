@@ -51,6 +51,10 @@
         <translation>Badges</translation>
     </message>
     <message>
+        <source>Badges unlocked</source>
+        <translation>Badges unlocked</translation>
+    </message>
+    <message>
         <source>Badges, ranks and quests earned from what you watch</source>
         <translation>Badges, ranks and quests earned from what you watch</translation>
     </message>
@@ -59,9 +63,26 @@
         <translation>Banner</translation>
     </message>
     <message>
+        <source>Best combo</source>
+        <translation>Best combo</translation>
+    </message>
+    <message>
+        <source>Best login streak</source>
+        <translation>Best login streak</translation>
+    </message>
+    <message>
+        <source>Best watch streak</source>
+        <translation>Best watch streak</translation>
+    </message>
+    <message>
         <source>Best: {0} days</source>
         <extracomment>The longest watch streak the viewer has reached</extracomment>
         <translation>Best: {0} days</translation>
+    </message>
+    <message>
+        <source>Bests</source>
+        <extracomment>Heading over the viewer's best figures</extracomment>
+        <translation>Bests</translation>
     </message>
     <message>
         <source>Bookshelf</source>
@@ -129,6 +150,10 @@
         <translation>Could not reroll those quests.</translation>
     </message>
     <message>
+        <source>Countries watched</source>
+        <translation>Countries watched</translation>
+    </message>
+    <message>
         <source>Covers one missed day. Only one can be banked.</source>
         <translation>Covers one missed day. Only one can be banked.</translation>
     </message>
@@ -143,6 +168,18 @@
     <message>
         <source>Daily</source>
         <translation>Daily</translation>
+    </message>
+    <message>
+        <source>Days signed in</source>
+        <translation>Days signed in</translation>
+    </message>
+    <message>
+        <source>Days watched</source>
+        <translation>Days watched</translation>
+    </message>
+    <message>
+        <source>Decades watched</source>
+        <translation>Decades watched</translation>
     </message>
     <message>
         <source>Double Credit</source>
@@ -171,6 +208,10 @@
         <translation>Done</translation>
     </message>
     <message>
+        <source>Early morning sessions</source>
+        <translation>Early morning sessions</translation>
+    </message>
+    <message>
         <source>Ends at %1</source>
         <translation>Ends at %1</translation>
     </message>
@@ -187,6 +228,10 @@
         <translation>Favorite</translation>
     </message>
     <message>
+        <source>Films watched</source>
+        <translation>Films watched</translation>
+    </message>
+    <message>
         <source>Forced</source>
         <extracomment>Marks a subtitle track the file itself flags as forced</extracomment>
         <translation>Forced</translation>
@@ -200,8 +245,17 @@
         <translation>Gallery</translation>
     </message>
     <message>
+        <source>Genres watched</source>
+        <translation>Genres watched</translation>
+    </message>
+    <message>
         <source>Go to Series</source>
         <translation>Go to Series</translation>
+    </message>
+    <message>
+        <source>Habits</source>
+        <extracomment>Heading over when and how often the viewer watches</extracomment>
+        <translation>Habits</translation>
     </message>
     <message>
         <source>Hours</source>
@@ -211,6 +265,10 @@
         <source>Hidden achievement</source>
         <extracomment>Stands in for a secret badge the viewer has not unlocked</extracomment>
         <translation>Hidden achievement</translation>
+    </message>
+    <message>
+        <source>Hours watched</source>
+        <translation>Hours watched</translation>
     </message>
     <message>
         <source>How should a movie or show look when you open it?</source>
@@ -237,13 +295,25 @@
         <translation>It comes straight out of your score bank.</translation>
     </message>
     <message>
+        <source>Items watched</source>
+        <translation>Items watched</translation>
+    </message>
+    <message>
         <source>Just now</source>
         <extracomment>Something that happened less than a minute ago</extracomment>
         <translation>Just now</translation>
     </message>
     <message>
+        <source>Languages watched</source>
+        <translation>Languages watched</translation>
+    </message>
+    <message>
         <source>Larger cards with titles underneath.</source>
         <translation>Larger cards with titles underneath.</translation>
+    </message>
+    <message>
+        <source>Late night sessions</source>
+        <translation>Late night sessions</translation>
     </message>
     <message>
         <source>Leaderboard</source>
@@ -252,6 +322,10 @@
     <message>
         <source>Left Sidebar</source>
         <translation>Left Sidebar</translation>
+    </message>
+    <message>
+        <source>Libraries visited</source>
+        <translation>Libraries visited</translation>
     </message>
     <message>
         <source>Library completion</source>
@@ -272,6 +346,11 @@
     <message>
         <source>Login attempt failed.</source>
         <translation>Login attempt failed.</translation>
+    </message>
+    <message>
+        <source>Longest single item</source>
+        <extracomment>The longest thing the viewer has watched, in minutes</extracomment>
+        <translation>Longest single item</translation>
     </message>
     <message>
         <source>MakD</source>
@@ -304,6 +383,18 @@
     <message>
         <source>More Actions</source>
         <translation>More Actions</translation>
+    </message>
+    <message>
+        <source>Most common badge</source>
+        <translation>Most common badge</translation>
+    </message>
+    <message>
+        <source>Most episodes in a day</source>
+        <translation>Most episodes in a day</translation>
+    </message>
+    <message>
+        <source>Most films in a day</source>
+        <translation>Most films in a day</translation>
     </message>
     <message>
         <source>Next</source>
@@ -381,6 +472,10 @@
         <translation>Recap</translation>
     </message>
     <message>
+        <source>Rewatches</source>
+        <translation>Rewatches</translation>
+    </message>
+    <message>
         <source>Running now</source>
         <extracomment>Shown on a power-up that is already working</extracomment>
         <translation>Running now</translation>
@@ -412,6 +507,10 @@
     <message>
         <source>Score bank</source>
         <translation>Score bank</translation>
+    </message>
+    <message>
+        <source>Score earned</source>
+        <translation>Score earned</translation>
     </message>
     <message>
         <source>Score to spend and the boosts you hold</source>
@@ -455,6 +554,10 @@
         <translation>Seerr requests</translation>
     </message>
     <message>
+        <source>Series finished</source>
+        <translation>Series finished</translation>
+    </message>
+    <message>
         <source>Server not found, is it online?</source>
         <translation>Server not found, is it online?</translation>
     </message>
@@ -489,6 +592,11 @@
         <translation>Specials</translation>
     </message>
     <message>
+        <source>Stats</source>
+        <extracomment>Records and figures from what the viewer has watched</extracomment>
+        <translation>Stats</translation>
+    </message>
+    <message>
         <source>Streak</source>
         <translation>Streak</translation>
     </message>
@@ -507,6 +615,34 @@
     <message>
         <source>Subtitles</source>
         <translation>Subtitles</translation>
+    </message>
+    <message>
+        <source>Your records and how the server is doing</source>
+        <translation>Your records and how the server is doing</translation>
+    </message>
+    <message>
+        <source>When you watch</source>
+        <extracomment>Heading over a chart of the hours the viewer watches in</extracomment>
+        <translation>When you watch</translation>
+    </message>
+    <message>
+        <source>Weekend sessions</source>
+        <translation>Weekend sessions</translation>
+    </message>
+    <message>
+        <source>Variety</source>
+        <extracomment>Heading over how widely the viewer watches</extracomment>
+        <translation>Variety</translation>
+    </message>
+    <message>
+        <source>Users</source>
+        <extracomment>How many people this server has</extracomment>
+        <translation>Users</translation>
+    </message>
+    <message>
+        <source>This server</source>
+        <extracomment>Heading over the whole server's figures</extracomment>
+        <translation>This server</translation>
     </message>
     <message>
         <source>Suggested items to watch</source>
@@ -2998,7 +3134,7 @@
     </message>
     <message>
         <source>{0} min</source>
-        <extracomment>How long a suggested item runs</extracomment>
+        <extracomment>How long something runs</extracomment>
         <translation>{0} min</translation>
     </message>
     <message>

@@ -39,8 +39,14 @@ namespace achievements
     ' says otherwise, since a plugin too old to report them still serves them.
     function Flags() as object
         info = chainLookupReturn(m.global, "session.achievementsInfo", invalid)
-        if not isValid(info) then return { available: false, leaderboardEnabled: true, questsEnabled: true, activityEnabled: true }
+        if not isValid(info) then return DefaultFlags()
         return info
+    end function
+
+    ' What a server that has not answered is taken to allow, which is everything but the one
+    ' switch that hides other people's figures
+    function DefaultFlags() as object
+        return { available: false, leaderboardEnabled: true, questsEnabled: true, activityEnabled: true, privacyMode: false }
     end function
 
     function IsAvailable() as boolean
@@ -51,15 +57,14 @@ namespace achievements
     ' user gets the same answer, and a server without the plugin has no such route.
     function Probe() as object
         config = GetMap("public-config")
-        if not isValid(config)
-            return { available: false, leaderboardEnabled: true, questsEnabled: true, activityEnabled: true }
-        end if
+        if not isValid(config) then return DefaultFlags()
 
         return {
             available: true,
             leaderboardEnabled: achievementsModel.Field(config, "LeaderboardEnabled") <> false,
             questsEnabled: achievementsModel.Field(config, "QuestsEnabled") <> false,
-            activityEnabled: achievementsModel.Field(config, "ActivityFeedEnabled") <> false
+            activityEnabled: achievementsModel.Field(config, "ActivityFeedEnabled") <> false,
+            privacyMode: achievementsModel.Field(config, "ForcePrivacyMode") = true
         }
     end function
 
@@ -144,6 +149,20 @@ namespace achievements
             outcome: POWER_UP_USED,
             slots: achievementsModel.ParsePowerUpSlots(achievementsModel.Field(written.body, "Inventory"))
         }
+    end function
+
+    ' The counters behind the stats screen. A task thread fetches one thing at a time, so the
+    ' three reads run one after the other.
+    function FetchStats() as object
+        userId = chainLookupReturn(m.global, "session.user.id", "")
+        stats = { records: {}, watchClock: [], server: {} }
+        if not isValidAndNotEmpty(userId) then return stats
+
+        stats.records = achievementsModel.ParseCounters(GetMap(`users/${userId}/records`))
+        stats.watchClock = achievementsModel.ParseWatchClock(GetMap(`users/${userId}/watch-clock`))
+        if not Flags().privacyMode then stats.server = achievementsModel.ParseServerStats(GetMap("server/stats"))
+
+        return stats
     end function
 
     ' What the server has unlocked lately, newest first. It can come back empty because the admin

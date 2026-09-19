@@ -100,6 +100,7 @@ sub init()
     m.badgeId = ""
     m.chase = invalid
     m.activity = []
+    m.stats = invalid
     m.powerUps = invalid
     m.shopItems = []
     m.shopBank = 0
@@ -143,6 +144,8 @@ sub onLoadResult(event as object)
         m.chase = result.chase
     else if result.kind = "activity"
         m.activity = result.activity
+    else if result.kind = "stats"
+        m.stats = result.stats
     else if result.kind = "powerups"
         m.powerUps = result.powerUps
     else if result.kind = "shop"
@@ -226,6 +229,8 @@ sub render()
         m.rows = badgeViewRows()
     else if m.view = "activity"
         m.rows = activityRows()
+    else if m.view = "stats"
+        m.rows = statsRows()
     else if m.view = "loadout"
         if not m.loading and not isValid(m.powerUps)
             showLoadFailed("powerups")
@@ -267,6 +272,7 @@ function breadcrumb() as string
     if m.view = "quests" then return `${title} / ${tr("Quests")}`
     if m.view = "activity" then return `${title} / ${tr("Activity")}`
     if m.view = "leaderboard" then return `${title} / ${tr("Leaderboard")}`
+    if m.view = "stats" then return `${title} / ${tr("Stats")}`
     if m.view = "recap" then return `${title} / ${tr("Recap")}`
     if m.view = "loadout" then return `${title} / ${tr("Loadout")}`
     if m.view = "shop" then return `${title} / ${tr("Loadout")} / ${tr("Shop")}`
@@ -572,6 +578,8 @@ function overviewRows() as object
         rows.push(navRow("leaderboard", tr("Leaderboard"), tr("How you compare with other users on this server"), "leaderboard", true))
     end if
 
+    rows.push(navRow("stats", tr("Stats"), tr("Your records and how the server is doing"), "bar_chart", true))
+
     rows.push(navRow("recap", tr("Recap"), tr("What you watched recently"), "insights", true))
 
     rows.push(navRow("loadout", tr("Loadout"), tr("Score to spend and the boosts you hold"), "backpack", true))
@@ -858,6 +866,133 @@ function activityRow(entry as object) as object
         height: 120
     }
 end function
+
+' The counters worth showing, in the order they read best. The plugin sends more than this. What
+' is left out is either a duplicate of something here, like minutes beside hours, or plumbing a
+' badge counts on that means nothing on its own.
+function statGroups() as object
+    return [
+        {
+            header: tr("Watched"),
+            rows: [
+                ["TotalItemsWatched", tr("Items watched")],
+                ["MoviesWatched", tr("Films watched")],
+                ["SeriesCompleted", tr("Series finished")],
+                ["TotalHoursWatched", tr("Hours watched")],
+                ["DaysWatched", tr("Days watched")],
+                ["RewatchCount", tr("Rewatches")]
+            ]
+        },
+        {
+            header: tr("Bests"),
+            rows: [
+                ["BestWatchStreak", tr("Best watch streak")],
+                ["BestLoginStreak", tr("Best login streak")],
+                ["MaxEpisodesInSingleDay", tr("Most episodes in a day")],
+                ["MaxMoviesInSingleDay", tr("Most films in a day")],
+                ["LongestItemMinutes", tr("Longest single item")],
+                ["BestComboCount", tr("Best combo")]
+            ]
+        },
+        {
+            header: tr("Habits"),
+            rows: [
+                ["LateNightSessions", tr("Late night sessions")],
+                ["EarlyMorningSessions", tr("Early morning sessions")],
+                ["WeekendSessions", tr("Weekend sessions")],
+                ["DaysLoggedIn", tr("Days signed in")]
+            ]
+        },
+        {
+            header: tr("Variety"),
+            rows: [
+                ["UniqueLibrariesVisited", tr("Libraries visited")],
+                ["UniqueGenresWatched", tr("Genres watched")],
+                ["UniqueDecadesWatched", tr("Decades watched")],
+                ["UniqueCountriesWatched", tr("Countries watched")],
+                ["UniqueLanguagesWatched", tr("Languages watched")]
+            ]
+        }
+    ]
+end function
+
+function statsRows() as object
+    rows = []
+    if not isValid(m.stats) then return rows
+
+    for each group in statGroups()
+        section = []
+        for each entry in group.rows
+            key = entry[0]
+            if m.stats.records.doesExist(key) then section.push(statRow(entry[1], statValue(key, m.stats.records[key])))
+        end for
+
+        if section.count() = 0 then continue for
+        rows.push(headingRow(group.header))
+        rows.append(section)
+    end for
+
+    if m.stats.watchClock.count() > 0
+        rows.push(headingRow(tr("When you watch")))
+        busiest = busiestHour()
+        if busiest > 0 then rows.push({ kind: "clock", hours: m.stats.watchClock, busiest: busiest, height: 120 })
+    end if
+
+    if m.stats.server.count() > 0
+        rows.push(headingRow(tr("This server")))
+        rows.append(serverRows())
+    end if
+
+    return rows
+end function
+
+function busiestHour() as integer
+    busiest = 0
+    for each count in m.stats.watchClock
+        if count > busiest then busiest = count
+    end for
+
+    return busiest
+end function
+
+function statRow(label as string, value as string) as object
+    return {
+        kind: "stat",
+        title: label,
+        trailingTop: value,
+        height: 120
+    }
+end function
+
+' The one counter that is a run time rather than a tally
+function statValue(key as string, count as integer) as string
+    if key = "LongestItemMinutes" then return substitute(tr("{0} min"), count.toStr())
+
+    return count.toStr()
+end function
+
+function serverRows() as object
+    server = m.stats.server
+    rows = [
+        statRow(tr("Users"), server.users.toStr()),
+        statRow(tr("Badges unlocked"), server.badgesUnlocked.toStr()),
+        statRow(tr("Items watched"), server.itemsWatched.toStr()),
+        statRow(tr("Films watched"), server.moviesWatched.toStr()),
+        statRow(tr("Series finished"), server.seriesCompleted.toStr()),
+        statRow(tr("Score earned"), server.score.toStr())
+    ]
+
+    if server.mostCommonBadge <> "" then rows.push(statRow(tr("Most common badge"), server.mostCommonBadge))
+
+    return rows
+end function
+
+sub openStats()
+    m.stats = invalid
+    m.loading = true
+    pushView("stats")
+    startLoad({ kind: "stats" })
+end sub
 
 sub openActivity()
     m.activity = []
@@ -1260,14 +1395,14 @@ sub onRowFocused()
     focused = m.rowList.itemFocused
     if focused < 0 or focused >= m.rows.count() then return
 
-    if m.rows[focused].kind <> "heading"
+    if isFocusStop(m.rows[focused])
         m.lastFocusIndex = focused
         return
     end if
 
     direction = focused >= m.lastFocusIndex ? 1 : -1
     target = focused + direction
-    while target >= 0 and target < m.rows.count() and m.rows[target].kind = "heading"
+    while target >= 0 and target < m.rows.count() and not isFocusStop(m.rows[target])
         target += direction
     end while
 
@@ -1277,6 +1412,12 @@ sub onRowFocused()
     m.pendingFocusIndex = target
     m.skipHeadingTimer.control = "start"
 end sub
+
+' A heading names what follows and the clock is a picture, so the cursor has no business on
+' either of them
+function isFocusStop(row as object) as boolean
+    return row.kind <> "heading" and row.kind <> "clock"
+end function
 
 ' Puts the cursor back on a row after the list is built again. The list focuses its first row
 ' as soon as it has content, and that row is a heading, so the skip it queued is dropped first
@@ -1306,6 +1447,8 @@ sub onRowSelected()
     if row.kind = "nav"
         if row.view = "activity"
             openActivity()
+        else if row.view = "stats"
+            openStats()
         else if row.view = "loadout"
             openLoadout()
         else if row.view = "shop"

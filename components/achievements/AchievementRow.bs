@@ -15,6 +15,14 @@ const ACHIEVEMENT_BODY_X = 88
 const ACHIEVEMENT_TRAILING = 150
 const PROGRESS_INK = "#FFFFFFB3"
 
+' The bars of the watch clock, read top to bottom
+const ACHIEVEMENT_CLOCK_HEIGHT = 56
+const ACHIEVEMENT_CLOCK_FLOOR = 2
+const ACHIEVEMENT_CLOCK_GAP = 2
+const ACHIEVEMENT_CLOCK_LABEL_GAP = 6
+const ACHIEVEMENT_CLOCK_LABEL_HEIGHT = 26
+const ACHIEVEMENT_CLOCK_MARK_WIDTH = 40
+
 sub init()
     m.rowFill = m.top.findNode("rowFill")
     m.rowFocus = m.top.findNode("rowFocus")
@@ -28,12 +36,15 @@ sub init()
     m.barTrack = m.top.findNode("barTrack")
     m.barFill = m.top.findNode("barFill")
     m.progressText = m.top.findNode("progressText")
+    m.clock = m.top.findNode("clock")
+    m.clockFont = m.top.findNode("clockFont")
     m.trailingTop = m.top.findNode("trailingTop")
     m.trailingBottom = m.top.findNode("trailingBottom")
 
     m.rowTitle.font.size = 26
     m.rowCaption.font.size = 22
     m.progressText.font.size = 20
+    m.clockFont.font.size = 18
     m.trailingTop.font.size = 20
     m.trailingBottom.font.size = 20
     m.gutter.font.size = 28
@@ -54,19 +65,21 @@ sub onContentChanged()
     m.rowFill.height = height
     m.rowFocus.height = height
 
-    ' A heading names what follows rather than being a row of its own, so it goes without the
-    ' tile the rest of the list rests on. The list hands the same components back out as focus
-    ' moves, so a row that has just become a heading puts down what the last one was wearing.
+    ' A heading names what follows and the clock is a picture, so neither is a row of its own and
+    ' neither wears the tile the rest of the list rests on. The list hands the same components
+    ' back out as focus moves, so a row that has just become one puts down what the last one wore.
     m.isHeading = data.kind = "heading"
-    m.rowFill.visible = not m.isHeading
+    m.isClock = data.kind = "clock"
+    m.rowFill.visible = not m.isHeading and not m.isClock
     m.rowFill.blendColor = m.restingFill
-    if m.isHeading then m.rowFocus.visible = false
+    if m.isHeading or m.isClock then m.rowFocus.visible = false
 
     m.top.opacity = data.dimmed = true ? 0.45 : 1.0
 
     layoutLeading(data, height)
     layoutBody(data, height)
     layoutTrailing(data, height)
+    layoutClock(data, height)
 
     ' The row is filled in after the walk that themed what the markup declared, so the text it
     ' just took on is offered to the theme too. A rarity keeps its own colour, since the walk
@@ -183,9 +196,51 @@ sub layoutTrailing(data as object, height as float)
     end if
 end sub
 
+' How much of the day goes into each hour. Each one is a share of the busiest hour over a 56
+' pixel box, on a floor of 2 so an hour with nothing in it still reads as a column.
+sub layoutClock(data as object, height as float)
+    m.clock.removeChildrenIndex(m.clock.getChildCount(), 0)
+    m.clock.visible = m.isClock
+    if not m.isClock then return
+
+    hours = data.hours
+    busiest = data.busiest
+    if busiest < 1 then return
+
+    width = ACHIEVEMENT_ROW_WIDTH - ACHIEVEMENT_ROW_PAD * 2
+    slot = width / hours.count()
+    stack = ACHIEVEMENT_CLOCK_HEIGHT + ACHIEVEMENT_CLOCK_LABEL_GAP + ACHIEVEMENT_CLOCK_LABEL_HEIGHT
+    m.clock.translation = [ACHIEVEMENT_ROW_PAD, (height - stack) / 2]
+
+    hour = 0
+    for each count in hours
+        bar = m.clock.createChild("Rectangle")
+        bar.color = m.accent
+        bar.width = slot - ACHIEVEMENT_CLOCK_GAP
+        bar.height = ACHIEVEMENT_CLOCK_FLOOR + (ACHIEVEMENT_CLOCK_HEIGHT - ACHIEVEMENT_CLOCK_FLOOR) * (count / busiest)
+        bar.translation = [hour * slot + ACHIEVEMENT_CLOCK_GAP / 2, ACHIEVEMENT_CLOCK_HEIGHT - bar.height]
+        hour++
+    end for
+
+    marks = [0, 6, 12, 18, 23]
+    spacing = (width - ACHIEVEMENT_CLOCK_MARK_WIDTH) / (marks.count() - 1)
+    index = 0
+    for each mark in marks
+        label = m.clock.createChild("Label")
+        label.font = m.clockFont.font
+        label.color = PROGRESS_INK
+        label.width = ACHIEVEMENT_CLOCK_MARK_WIDTH
+        label.height = ACHIEVEMENT_CLOCK_LABEL_HEIGHT
+        label.horizAlign = "center"
+        label.text = mark.toStr()
+        label.translation = [index * spacing, ACHIEVEMENT_CLOCK_HEIGHT + ACHIEVEMENT_CLOCK_LABEL_GAP]
+        index++
+    end for
+end sub
+
 ' A focused row takes the same deepened fill and light text the settings rows take
 sub onFocusChanged()
-    if m.isHeading = true then return
+    if m.isHeading = true or m.isClock = true then return
 
     focused = m.top.itemHasFocus
     m.rowFocus.visible = focused

@@ -65,6 +65,16 @@ namespace achievementsModel
         return value = true
     end function
 
+    ' A JSON number arrives as any of the four number types, and a counter has to be told apart
+    ' from the names and flags sitting beside it
+    function IsNumber(value as dynamic) as boolean
+        if not isValid(value) then return false
+
+        kind = LCase(type(value))
+        if Left(kind, 2) = "ro" then kind = Mid(kind, 3)
+        return kind = "integer" or kind = "float" or kind = "double" or kind = "longinteger"
+    end function
+
     ' When something happened, as seconds since the epoch. All of this is read on a task thread
     ' and drawn on the render thread, and a date object does not survive that trip while a number
     ' does. A timestamp the server wrote oddly reads as nothing rather than stopping the row.
@@ -293,6 +303,63 @@ namespace achievementsModel
         return {
             bank: AsInt(Field(json, "ScoreBank")),
             slots: ParsePowerUpSlots(Field(json, "Inventory"))
+        }
+    end function
+
+    ' Counters keyed the way the plugin names them, such as BestWatchStreak. Keeping the map
+    ' rather than naming every one means a counter the plugin adds later needs a label and
+    ' nothing else.
+    function ParseCounters(json as dynamic) as object
+        out = {}
+        if not IsObject(json) then return out
+
+        for each key in json
+            if IsNumber(json[key]) then out[key] = AsInt(json[key])
+        end for
+        return out
+    end function
+
+    ' How much the viewer watches in each hour of the day, as one count per hour. The plugin keys
+    ' it by hour, so a clock it did not send comes back empty rather than as a flat day.
+    function ParseWatchClock(json as dynamic) as object
+        if not IsObject(json) then return []
+
+        hours = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        sent = false
+
+        for each key in json
+            hour = HourOf(key)
+            if hour < 0 or not IsNumber(json[key]) then continue for
+
+            hours[hour] = AsInt(json[key])
+            sent = true
+        end for
+
+        return sent ? hours : []
+    end function
+
+    ' Which hour a key names, or -1 when it names none. val() reads a word as zero, so a key has
+    ' to spell itself back the same way to count as one.
+    function HourOf(key as dynamic) as integer
+        text = AsString(key).trim()
+        hour = Int(val(text))
+        if text <> hour.toStr() or hour < 0 or hour > 23 then return -1
+
+        return hour
+    end function
+
+    ' How the whole server is doing, which an admin can hide
+    function ParseServerStats(json as dynamic) as object
+        if not IsObject(json) then return {}
+
+        return {
+            users: AsInt(Field(json, "TotalUsers")),
+            badgesUnlocked: AsInt(Field(json, "TotalBadgesUnlocked")),
+            itemsWatched: AsInt(Field(json, "TotalItemsWatched")),
+            moviesWatched: AsInt(Field(json, "TotalMoviesWatched")),
+            seriesCompleted: AsInt(Field(json, "TotalSeriesCompleted")),
+            score: AsInt(Field(json, "TotalAchievementScore")),
+            mostCommonBadge: AsString(Field(json, "MostCommonBadge"))
         }
     end function
 
