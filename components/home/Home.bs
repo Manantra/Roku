@@ -594,6 +594,11 @@ sub refresh()
     m.homeRows.callFunc("updateHomeRows")
 end sub
 
+' For a change that decides which rows exist at all, rather than what is in them
+sub reload()
+    m.homeRows.callFunc("reloadHomeRows")
+end sub
+
 sub loadLibraries()
     m.homeRows.callFunc("loadLibraries")
 end sub

@@ -3,6 +3,7 @@ import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/PosterLoadStatus.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/multiserver.bs"
 import "pkg:/source/utils/serverMessages.bs"
@@ -181,12 +182,14 @@ sub rebuildNavItems()
     if m.genresButtonEnabled then m.navItems.push(m.genresItem)
     if m.favoritesButtonEnabled then m.navItems.push(m.favoritesItem)
 
+    kids = kidsMode.Enabled()
+
     seerrEnabled = parseBoolSetting(m.global.session.user.settings["seerr.enabled"])
-    if seerrEnabled and m.seerrButtonEnabled
+    if not kids and seerrEnabled and m.seerrButtonEnabled
         m.navItems.push(m.seerrItem)
     end if
 
-    if m.librariesEnabled then m.navItems.push(m.librariesItem)
+    if not kids and m.librariesEnabled then m.navItems.push(m.librariesItem)
 
     if m.librariesExpanded
         for each libItem in m.libraryItems

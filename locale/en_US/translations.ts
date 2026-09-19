@@ -233,9 +233,17 @@
         <translation>Enter Configuration</translation>
     </message>
     <message>
+        <source>Enter your PIN to restore the full app</source>
+        <translation>Enter your PIN to restore the full app</translation>
+    </message>
+    <message>
         <source>Equipped</source>
         <extracomment>Shown on the avatar or title the profile wears</extracomment>
         <translation>Equipped</translation>
+    </message>
+    <message>
+        <source>Exit Kids Mode</source>
+        <translation>Exit Kids Mode</translation>
     </message>
     <message>
         <source>Failed to load</source>
@@ -305,6 +313,10 @@
         <translation>How you compare with other users on this server</translation>
     </message>
     <message>
+        <source>Incorrect PIN</source>
+        <translation>Incorrect PIN</translation>
+    </message>
+    <message>
         <source>Instant Mix</source>
         <translation>Instant Mix</translation>
     </message>
@@ -320,6 +332,11 @@
         <source>Just now</source>
         <extracomment>Something that happened less than a minute ago</extracomment>
         <translation>Just now</translation>
+    </message>
+    <message>
+        <source>Kids Mode</source>
+        <extracomment>Strips the app back to what a child needs and locks the way out with a PIN</extracomment>
+        <translation>Kids Mode</translation>
     </message>
     <message>
         <source>Languages watched</source>
@@ -469,6 +486,10 @@
         <translation>Pick a look</translation>
     </message>
     <message>
+        <source>PIN must be exactly 4 digits.</source>
+        <translation>PIN must be exactly 4 digits.</translation>
+    </message>
+    <message>
         <source>Play</source>
         <translation>Play</translation>
     </message>
@@ -595,6 +616,10 @@
     <message>
         <source>Sign In</source>
         <translation>Sign In</translation>
+    </message>
+    <message>
+        <source>Simplify the app and lock the way out with a PIN</source>
+        <translation>Simplify the app and lock the way out with a PIN</translation>
     </message>
     <message>
         <source>Size: {0}  &#8226;  Format: {1}</source>
@@ -3210,6 +3235,20 @@
     <message>
         <source>{0} favorites sorted by {1}</source>
         <translation>{0} favorites sorted by {1}</translation>
+    </message>
+    <message>
+        <source>{0}m</source>
+        <extracomment>A wait in whole minutes</extracomment>
+        <translation>{0}m</translation>
+    </message>
+    <message>
+        <source>{0}s</source>
+        <extracomment>A wait in seconds</extracomment>
+        <translation>{0}s</translation>
+    </message>
+    <message>
+        <source>Too many attempts. Try again in {0}.</source>
+        <translation>Too many attempts. Try again in {0}.</translation>
     </message>
     <message>
         <source>{0} unlocked {1}</source>

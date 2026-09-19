@@ -127,6 +127,7 @@
     <field id="quickPlayNode" alias="homeRows.quickPlayNode" />
     <field id="shuffleSelectedItem" type="node" alwaysNotify="true" />
     <function name="refresh" />
+    <function name="reload" />
     <function name="loadLibraries" />
   </interface>
 </component>

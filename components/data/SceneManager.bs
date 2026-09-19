@@ -1,6 +1,7 @@
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/String.bs"
 import "pkg:/source/utils/fontApply.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/themeChrome.bs"
 import "pkg:/source/utils/tvKeyboard.bs"
@@ -69,6 +70,7 @@ end sub
 ' Push a new group onto the stack, replacing the existing group on the screen
 sub pushScene(newGroup)
     currentGroup = m.groups.peek()
+    if isValid(newGroup) and kidsMode.Blocked(newGroup.subtype()) then return
 
     if isValid(newGroup)
         if isValid(currentGroup)

@@ -3,6 +3,7 @@ import "pkg:/source/api/Image.bs"
 import "pkg:/source/api/Items.bs"
 import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/multiserver.bs"
 import "pkg:/source/utils/SeerrUtils.bs"
 
@@ -147,6 +148,8 @@ sub search()
 end sub
 
 sub appendSeerrResults(results as object, query as string)
+    if kidsMode.Enabled() then return
+
     config = GetSeerrConfig()
     if config = invalid or not SeerrParseBool(config.enabled, false) then return
 

@@ -1,0 +1,228 @@
+import "pkg:/source/api/sdk.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Narrows a server wide query to the libraries it is allowed to touch.
+'
+' Two separate ideas live here, because they behave differently. Access is what the admin granted
+' the account through EnableAllFolders and EnabledFolders, which the server enforces on every user
+' scoped route, so reading it here is a second opinion rather than the gate. Visibility is what
+' the viewer themselves hid from My Media, which the server does not apply to a recursive query,
+' so a row that would sweep the whole server has to narrow the search itself.
+'
+' Everything here fails open. A row that shows too much is a smaller problem than one that shows
+' nothing, and the server still refuses anything the account has no access to.
+
+' Collection types that can hold each item type, so a search only visits the libraries worth
+' visiting. A library that declares no type holds anything, so it is always worth a look.
+const SCOPE_TYPES_BY_ITEM = { Movie: "movies", Series: "tvshows", Episode: "tvshows", BoxSet: "boxsets" }
+
+' Types that do not live under a library at all. Asking every library for a person finds none.
+const SCOPE_LIBRARY_LESS = ["Person"]
+
+namespace libraryScope
+
+    ' The one call a row loader makes. A query that already names a parent, or that is paging, is
+    ' passed straight through: it is either scoped already or counting on the server to count.
+    function Items(params as object) as dynamic
+        if isValidAndNotEmpty(chainLookupReturn(params, "ParentId", "")) then return api.items.Get(params)
+        if Val(AsText(chainLookupReturn(params, "StartIndex", 0))) > 0 then return api.items.Get(params)
+
+        ids = VisibleIds(chainLookupReturn(params, "IncludeItemTypes", ""))
+        if not isValid(ids) then return api.items.Get(params)
+
+        answers = []
+        for each id in ids
+            asked = {}
+            asked.append(params)
+            asked.ParentId = id
+
+            ' A library that fails is dropped rather than taking the row down with it
+            answer = api.items.Get(asked)
+            if isChainValid(answer, "Items") then answers.push(answer)
+        end for
+
+        return Merge(answers, params)
+    end function
+
+    ' The libraries to search for these item types, or nothing when one sweep is still right
+    function VisibleIds(includeItemTypes as dynamic) as dynamic
+        excludes = chainLookupReturn(m.global, "session.user.configuration.MyMediaExcludes", [])
+        if not isValidAndNotEmpty(excludes) then return invalid
+        if LibraryLess(includeItemTypes) then return invalid
+
+        wanted = WantedTypes(includeItemTypes)
+        permitted = PermittedIds()
+
+        ids = []
+        for each view in Views()
+            id = chainLookupReturn(view, "Id", "")
+            if not isValidAndNotEmpty(id) or inArray(excludes, id) then continue for
+            if isValid(permitted) and not inArray(permitted, id) then continue for
+            if not HoldsTypes(chainLookupReturn(view, "CollectionType", ""), wanted) then continue for
+
+            ids.push(id)
+        end for
+
+        ' Nothing left to search would empty the row, so let the sweep stand and show something
+        return ids.count() = 0 ? invalid : ids
+    end function
+
+    ' Library ids the account is allowed to see, or nothing when the policy places no restriction.
+    ' Nothing is everything, never none.
+    function PermittedIds() as dynamic
+        policy = chainLookupReturn(m.global, "session.user.Policy", invalid)
+        if not isValid(policy) or policy.EnableAllFolders = true then return invalid
+
+        blocked = isValidAndNotEmpty(policy.BlockedMediaFolders) ? policy.BlockedMediaFolders : []
+        allowed = []
+        if isValidAndNotEmpty(policy.EnabledFolders)
+            for each id in policy.EnabledFolders
+                if isValidAndNotEmpty(id) and not inArray(blocked, id) then allowed.push(id)
+            end for
+        end if
+
+        ' An empty allow list with EnableAllFolders off would mean no library at all, which is
+        ' almost always a parse problem rather than intent. Defer to the server instead of
+        ' blanking the screen.
+        return allowed.count() = 0 ? invalid : allowed
+    end function
+
+    function KeepPermitted(ids as object) as object
+        permitted = PermittedIds()
+        if not isValid(permitted) then return ids
+
+        kept = []
+        for each id in ids
+            if inArray(permitted, id) then kept.push(id)
+        end for
+
+        return kept
+    end function
+
+    ' The views the account has, asked for once per row rather than per query
+    function Views() as object
+        if isValid(m.scopeViews) then return m.scopeViews
+
+        m.scopeViews = []
+        data = api.GetUserViews({ userId: m.global.session.user.id })
+        if isChainValid(data, "Items") then m.scopeViews = data.Items
+
+        return m.scopeViews
+    end function
+
+    function WantedTypes(includeItemTypes as dynamic) as object
+        wanted = []
+        for each name in ItemTypes(includeItemTypes)
+            collection = SCOPE_TYPES_BY_ITEM[name]
+            if isValidAndNotEmpty(collection) and not inArray(wanted, collection) then wanted.push(collection)
+        end for
+
+        return wanted
+    end function
+
+    function HoldsTypes(collectionType as dynamic, wanted as object) as boolean
+        kind = LCase(AsText(collectionType))
+        ' No type means it holds anything, and nothing wanted means everything is worth a look
+        if not isValidAndNotEmpty(kind) or wanted.count() = 0 then return true
+
+        return inArray(wanted, kind)
+    end function
+
+    function LibraryLess(includeItemTypes as dynamic) as boolean
+        names = ItemTypes(includeItemTypes)
+        if names.count() = 0 then return false
+
+        for each name in names
+            if not inArray(SCOPE_LIBRARY_LESS, name) then return false
+        end for
+
+        return true
+    end function
+
+    function ItemTypes(includeItemTypes as dynamic) as object
+        if LCase(type(includeItemTypes)) = "roarray" then return includeItemTypes
+        text = AsText(includeItemTypes)
+        if not isValidAndNotEmpty(text) then return []
+
+        return text.split(",")
+    end function
+
+    ' Folds the per library answers back into the one response the caller expected
+    function Merge(answers as object, params as object) as object
+        merged = []
+        total = 0
+        for each answer in answers
+            for each item in answer.Items
+                merged.push(item)
+            end for
+            total += Int(Val(AsText(chainLookupReturn(answer, "TotalRecordCount", 0))))
+        end for
+
+        ' Each library ordered only its own share, so a merged list needs the sort redone
+        if answers.count() > 1 then merged = Sorted(merged, params)
+
+        limit = Int(Val(AsText(chainLookupReturn(params, "Limit", 0))))
+        if limit > 0 and merged.count() > limit
+            cut = []
+            for i = 0 to limit - 1
+                cut.push(merged[i])
+            end for
+            merged = cut
+        end if
+
+        return { Items: merged, TotalRecordCount: total = 0 ? merged.count() : total }
+    end function
+
+    ' A sort this cannot reproduce leaves the merged list in the order the libraries answered
+    function Sorted(merged as object, params as object) as object
+        field = AsText(chainLookupReturn(params, "SortBy", "")).split(",")[0]
+        ascending = LCase(AsText(chainLookupReturn(params, "SortOrder", "Ascending"))) <> "descending"
+
+        ' The one the server holds on the item rather than beside it
+        if isStringEqual(field, "DatePlayed") then return SortedBy(merged, "UserData.LastPlayedDate", ascending, false)
+        if isStringEqual(field, "SortName") then return SortedBy(merged, "SortName", ascending, false)
+        if isStringEqual(field, "DateCreated") or isStringEqual(field, "PremiereDate") then return SortedBy(merged, field, ascending, false)
+        if isStringEqual(field, "CommunityRating") or isStringEqual(field, "CriticRating") or isStringEqual(field, "ProductionYear") then return SortedBy(merged, field, ascending, true)
+        if isStringEqual(field, "Runtime") then return SortedBy(merged, "RunTimeTicks", ascending, true)
+
+        return merged
+    end function
+
+    function SortedBy(merged as object, field as string, ascending as boolean, numeric as boolean) as object
+        keyed = []
+        for each item in merged
+            keyed.push({ key: SortKey(item, field, numeric), item: item })
+        end for
+
+        keyed.sortBy("key", ascending ? "i" : "ri")
+
+        ordered = []
+        for each entry in keyed
+            ordered.push(entry.item)
+        end for
+
+        return ordered
+    end function
+
+    function SortKey(item as object, field as string, numeric as boolean) as dynamic
+        value = chainLookupReturn(item, field, invalid)
+        if numeric then return Val(AsText(value))
+
+        text = AsText(value)
+        if field = "SortName" and not isValidAndNotEmpty(text) then text = AsText(chainLookupReturn(item, "Name", ""))
+
+        return LCase(text)
+    end function
+
+    ' Everything read out of a payload is compared as text, and a missing one reads as empty
+    function AsText(value as dynamic) as string
+        if not isValid(value) then return ""
+
+        kind = LCase(type(value))
+        if kind = "rostring" or kind = "string" then return value
+        if kind = "roassociativearray" or kind = "roarray" then return ""
+
+        return value.toStr()
+    end function
+
+end namespace

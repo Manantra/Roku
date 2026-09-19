@@ -10,13 +10,17 @@ import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/detailMetadataLayout.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
 import "pkg:/source/utils/homeRowLayout.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/utils/pinLockout.bs"
 import "pkg:/source/utils/SeerrUtils.bs"
 import "pkg:/source/utils/settingsSync.bs"
 import "pkg:/source/utils/themeApply.bs"
 import "pkg:/source/utils/themeRegistry.bs"
 import "pkg:/source/utils/tvKeyboard.bs"
 
+const TOAST_LINE_HEIGHT = 45
+const TOAST_CHARACTER_WIDTH = 16
 
 sub init()
     m.top.optionsAvailable = false
@@ -26,6 +30,7 @@ sub init()
     m.magicKeyPressSequence = [KeyCode.UP, KeyCode.LEFT, KeyCode.REPLAY, KeyCode.REWIND, KeyCode.UP, KeyCode.LEFT, KeyCode.REPLAY, KeyCode.REWIND]
 
     m.userLocation = []
+    m.kidsPinMode = ""
 
     m.settingsMenu = m.top.findNode("settingsMenu")
     'm.settingsMenu.focusBitmapBlendColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
@@ -1113,7 +1118,76 @@ sub onColorSelected()
     m.settingsMenu.setFocus(true)
 end sub
 
+' The one keypad the screen has, borrowed for the four digits that hold Kids Mode shut
+sub openKidsPin(mode as string)
+    m.kidsPinMode = mode
+    m.settingDesc.visible = false
+    m.integerSetting.text = ""
+    m.integerSetting.visible = true
+    m.integerSetting.setFocus(true)
+end sub
+
+sub submitKidsPin()
+    entered = m.integerSetting.text
+
+    if m.kidsPinMode = "set"
+        if not pinLockout.IsPinShaped(entered)
+            ShowToast(tr("PIN must be exactly 4 digits."))
+            return
+        end if
+
+        set_user_setting("kids.pinHash", pinLockout.HashPin(entered))
+        set_user_setting("kids.enabled", "true")
+        pinLockout.ClearLockout()
+        leaveKidsPin()
+        return
+    end if
+
+    ' Asked before the guess is looked at, so waiting is the only way through and reopening the
+    ' keypad hands back no fresh guesses
+    waiting = pinLockout.Remaining()
+    if waiting > 0
+        ShowToast(pinLockout.TooManyAttempts(waiting))
+        m.integerSetting.text = ""
+        return
+    end if
+
+    if kidsMode.NeedsPin() and not pinLockout.Matches(entered, get_user_setting("kids.pinHash"))
+        wait = pinLockout.RegisterFailure()
+        ShowToast(wait > 0 ? pinLockout.TooManyAttempts(wait) : tr("Incorrect PIN"))
+        m.integerSetting.text = ""
+        return
+    end if
+
+    ' The PIN belonged to this stretch of the mode. Clearing it means the next time Kids Mode goes
+    ' on, someone picks a code for it rather than a forgotten one still being the way out.
+    set_user_setting("kids.enabled", "false")
+    set_user_setting("kids.pinHash", "")
+    pinLockout.ClearLockout()
+    leaveKidsPin()
+end sub
+
+' The settings screen is standing on entries the mode has just taken away, and the home screen
+' behind it is holding rows it either lost or got back
+sub leaveKidsPin()
+    m.kidsPinMode = ""
+    hideEditingControls()
+    dismissPanel()
+
+    while m.global.sceneManager.callFunc("getSceneCount") > 1
+        m.global.sceneManager.callFunc("popScene")
+    end while
+
+    home = m.global.sceneManager.callFunc("getActiveScene")
+    if isValid(home) and home.isSubtype("Home") then home.callFunc("reload")
+end sub
+
 sub onKeyGridSubmit()
+    if m.kidsPinMode <> ""
+        submitKidsPin()
+        return
+    end if
+
     selectedSetting = getFocusedSetting()
     if not isValid(selectedSetting) then return
 
@@ -1130,6 +1204,7 @@ end sub
 
 sub onKeyGridEscape()
     if m.integerSetting.escape = "left" or m.integerSetting.escape = "back"
+        m.kidsPinMode = ""
         hideEditingControls()
         m.settingsMenu.setFocus(true)
     end if
@@ -1240,6 +1315,11 @@ sub ShowToast(message as string, _toastType = "" as string)
 
     ' Create a simple toast notification using JFMessageDialog
     toast = createObject("roSGNode", "JFMessageDialog")
+    ' The dialog works its height out from the size it is told, and a message without one is
+    ' drawn with no room to appear in. A font registry is main thread only, so the line is
+    ' measured from what it holds.
+    toast.fontHeight = TOAST_LINE_HEIGHT
+    toast.fontWidth = toastMessage.len() * TOAST_CHARACTER_WIDTH
     toast.message = toastMessage
     toast.options = ["OK"]
     m.top.getScene().appendChild(toast)
@@ -1280,6 +1360,14 @@ sub DismissToast()
     end if
 
     m.activeToast = invalid
+
+    ' A PIN the viewer is still in the middle of gets its keypad back rather than the list
+    if m.kidsPinMode <> ""
+        m.integerSetting.visible = true
+        m.integerSetting.setFocus(true)
+        return
+    end if
+
     m.settingsMenu.setFocus(true)
 end sub
 
@@ -1705,6 +1793,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     if personalizationChildren.count() > 0
         reordered.push({
             title: "Personalization",
+            requires: "notKidsMode",
             description: "Navigation, home screen, colors, and interface preferences.",
             icon: "personalization.png",
             children: personalizationChildren
@@ -1739,6 +1828,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     if integrationsChildren.count() > 0
         reordered.push({
             title: "Integrations",
+            requires: "notKidsMode",
             description: "Plugin, Seerr, ratings, and achievement integrations.",
             icon: "integrations.png",
             children: integrationsChildren
@@ -1768,6 +1858,7 @@ function reorderSettingsForFlutter(configTree as object) as object
     if aboutChildren.count() > 0
         reordered.push({
             title: "About",
+            requires: "notKidsMode",
             description: "Support Moonfin and project information.",
             icon: "info.png",
             children: aboutChildren
@@ -1789,6 +1880,7 @@ function reorderSettingsForFlutter(configTree as object) as object
         reordered.push({
             title: "Additional Settings",
             description: "Settings that are not yet grouped in the new layout.",
+            requires: "notKidsMode",
             children: additionalChildren
         })
     end if
@@ -1981,6 +2073,16 @@ sub settingSelected()
         ' A deliberate re-run asks every question again, answered or not
         wizard.rerun = true
         m.global.sceneManager.callFunc("pushScene", wizard)
+        return
+    end if
+
+    if isValid(selectedItem.settingName) and selectedItem.settingName = "kids.turnOn"
+        openKidsPin("set")
+        return
+    end if
+
+    if isValid(selectedItem.settingName) and selectedItem.settingName = "kids.exit"
+        openKidsPin("exit")
         return
     end if
 
@@ -2600,5 +2702,7 @@ end sub
 ' What a settings entry can ask the server for before it is worth showing
 function settingRequirementMet(requirement as string) as boolean
     if requirement = "achievements" then return achievements.IsAvailable()
+    if requirement = "kidsMode" then return kidsMode.Enabled()
+    if requirement = "notKidsMode" then return not kidsMode.Enabled()
     return true
 end function

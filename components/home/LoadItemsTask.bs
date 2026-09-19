@@ -10,6 +10,7 @@ import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
 import "pkg:/source/utils/HomeRecommendations.bs"
 import "pkg:/source/utils/homeRowLayout.bs"
+import "pkg:/source/utils/libraryScope.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/seerrBrowseRows.bs"
 import "pkg:/source/utils/SeerrUtils.bs"
@@ -377,7 +378,7 @@ function loadSinceYouWatchedSeeds(sourceItem as string, sourceType as string) as
         params.sortOrder = "Descending"
     end if
 
-    data = api.items.Get(params)
+    data = libraryScope.Items(params)
     if not isChainValid(data, "Items") then return []
 
     if LCase(sourceItem) = "recentlywatched"
@@ -424,7 +425,7 @@ function loadSinceYouWatchedLocal(seed as object, sourceType as string, includeW
     candidates = {}
 
     if ctx.genres.Count() > 0
-        addRecommendationCandidates(candidates, api.items.Get({
+        addRecommendationCandidates(candidates, libraryScope.Items({
             UserId: m.global.session.user.id,
             includeItemTypes: candidateTypes,
             genres: joinArray(ctx.genres, "|"),
@@ -436,7 +437,7 @@ function loadSinceYouWatchedLocal(seed as object, sourceType as string, includeW
     end if
 
     if ctx.tags.Count() > 0
-        addRecommendationCandidates(candidates, api.items.Get({
+        addRecommendationCandidates(candidates, libraryScope.Items({
             UserId: m.global.session.user.id,
             includeItemTypes: candidateTypes,
             tags: joinArray(ctx.tags, "|"),
@@ -457,7 +458,7 @@ function loadSinceYouWatchedLocal(seed as object, sourceType as string, includeW
         actorCount = actorCount + 1
     end for
     if personIds.Count() > 0
-        addRecommendationCandidates(candidates, api.items.Get({
+        addRecommendationCandidates(candidates, libraryScope.Items({
             UserId: m.global.session.user.id,
             includeItemTypes: candidateTypes,
             personIds: joinArray(personIds, ","),
@@ -489,7 +490,7 @@ function loadSinceYouWatchedLocal(seed as object, sourceType as string, includeW
             EnableTotalRecordCount: false
         }
         if ctx.genres.Count() > 0 then fillerParams.genres = joinArray(ctx.genres, "|")
-        fillerData = api.items.Get(fillerParams)
+        fillerData = libraryScope.Items(fillerParams)
         if isChainValid(fillerData, "Items")
             for each fillerItem in fillerData.Items
                 fillerId = fillerItem.LookupCI("Id")
@@ -797,7 +798,7 @@ function isFullyWatchedSeries(series as object, userId as string) as boolean
 end function
 
 sub addRewatchShows(watchedItems as object, seriesLastPlayed as object, userId as string, seriesFields as string)
-    epData = api.items.Get({
+    epData = libraryScope.Items({
         UserId: userId,
         includeItemTypes: "Episode",
         filters: "IsPlayed",
@@ -843,7 +844,7 @@ sub addRewatchShows(watchedItems as object, seriesLastPlayed as object, userId a
 end sub
 
 sub addRewatchCollections(watchedItems as object, collectionLastPlayed as object, userId as string)
-    boxData = api.items.Get({
+    boxData = libraryScope.Items({
         UserId: userId,
         includeItemTypes: "BoxSet",
         recursive: true,
@@ -964,7 +965,7 @@ function loadRewatch() as object
     collectionLastPlayed = {}
 
     if includeMovies
-        movieData = api.items.Get({
+        movieData = libraryScope.Items({
             UserId: userId,
             includeItemTypes: "Movie",
             filters: "IsPlayed",
@@ -1716,7 +1717,7 @@ function loadFavorites() as object
         EnableTotalRecordCount: false
     }
 
-    data = api.items.Get(params)
+    data = libraryScope.Items(params)
 
     if not isChainValid(data, "Items") then return results
 
@@ -2940,7 +2941,7 @@ function loadCollections() as object
     settings = m.global.session.user.settings
     collectionsSortBy = getStringSetting(settings, "ui.home.collectionsRowSortBy", "name")
 
-    data = api.items.Get({
+    data = libraryScope.Items({
         userid: m.global.session.user.id,
         includeItemTypes: "BoxSet",
         recursive: true,
@@ -3032,7 +3033,7 @@ end function
 
 function loadAudio() as object
     results = []
-    data = api.items.Get({
+    data = libraryScope.Items({
         userid: m.global.session.user.id,
         includeItemTypes: "MusicAlbum",
         recursive: true,

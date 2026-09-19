@@ -2,6 +2,7 @@ import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/utils/buttonLayout.bs"
 import "pkg:/source/utils/detailActions.bs"
 import "pkg:/source/utils/detailButtons.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/seerrButtons.bs"
 import "pkg:/source/utils/seerrDetailHost.bs"
@@ -38,7 +39,7 @@ sub addArrangedButtons(candidates as object)
         candidates.push(candidate)
     end for
 
-    for each candidate in buttonLayout.Arrange(buttonLayout.InCatalogueOrder(candidates), order, hidden)
+    for each candidate in buttonLayout.Arrange(kidsMode.KeepButtons(buttonLayout.InCatalogueOrder(candidates)), order, hidden)
         addButton(candidate.config)
     end for
 end sub

@@ -3,6 +3,7 @@ import "pkg:/source/constants/HomeRowItemSizes.bs"
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/homeRowLayout.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/misc.bs"
 import "pkg:/source/utils/multiserver.bs"
 
@@ -204,8 +205,24 @@ end function
 ' Arranged reads and parses the stored layout, and a row build asks for it once per row
 ' across several passes, so the answer is kept until the rows are built again
 function localRowOrder() as object
-    if not isArrayValue(m.cachedRowOrder) then m.cachedRowOrder = homeRowLayout.Arranged()
+    if not isArrayValue(m.cachedRowOrder)
+        order = homeRowLayout.Arranged()
+        if kidsMode.Enabled() then order = kidsMode.Sections(normalizedSections(order))
+        m.cachedRowOrder = order
+    end if
     return m.cachedRowOrder
+end function
+
+' The stored layout keeps whatever name the client that wrote it used, and Kids Mode decides by
+' this app's own
+function normalizedSections(order as object) as object
+    named = []
+    for each entry in order
+        known = normalizeSectionId(entry)
+        named.push(isValidAndNotEmpty(known) ? known : LCase(toNormalizedString(entry)))
+    end for
+
+    return named
 end function
 
 ' The other clients name a few of these rows differently, so an id arriving from one of
@@ -800,7 +817,7 @@ sub createLibraryRow()
     if isValid(m.global.session.user.configuration) and isValid(m.global.session.user.configuration.MyMediaExcludes)
         excludeList = m.global.session.user.configuration.MyMediaExcludes
     end if
-    filteredMedia = filterNodeArray(m.libraryData, "id", excludeList)
+    filteredMedia = kidsMode.KeepLibraries(filterNodeArray(m.libraryData, "id", excludeList))
     for each item in filteredMedia
         row.appendChild(item)
     end for
@@ -1824,6 +1841,13 @@ sub updateHomeRows()
     ' Hide the row counter to prevent flicker. We'll show it once loading timer fires
     m.top.showRowCounter = [false]
     startHomeRowsLoading()
+end sub
+
+' A layout change takes rows away as well as adding them, so the list is emptied before it is
+' filled again rather than merged with whatever the last one left standing
+sub reloadHomeRows()
+    m.top.content = CreateObject("roSGNode", "ContentNode")
+    updateHomeRows()
 end sub
 
 ' updateFavoritesItems: Processes LoadFavoritesTask content. Removes, Creates, or Updates favorites row as needed

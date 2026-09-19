@@ -1,0 +1,85 @@
+import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/misc.bs"
+
+' The PIN that holds Kids Mode shut, and what a wrong guess costs.
+'
+' Four digits is only ten thousand combinations, which is an evening's work for a determined child
+' if guessing is free, so each wrong guess past the first few costs a growing wait.
+
+' Wrong guesses allowed before each further one costs a wait
+const PIN_FREE_ATTEMPTS = 5
+' How far the wait grows per wrong guess past the free ones, and where it stops
+const PIN_LOCKOUT_STEP = 30
+const PIN_MAX_LOCKOUT = 900
+
+namespace pinLockout
+
+    function HashPin(pin as string) as string
+        bytes = CreateObject("roByteArray")
+        bytes.FromAsciiString(pin)
+
+        digest = CreateObject("roEVPDigest")
+        digest.Setup("sha256")
+        return digest.Process(bytes)
+    end function
+
+    function IsPinShaped(pin as string) as boolean
+        text = pin.trim()
+        if Len(text) <> 4 then return false
+
+        for i = 1 to 4
+            digit = Mid(text, i, 1)
+            if digit < "0" or digit > "9" then return false
+        end for
+
+        return true
+    end function
+
+    ' Whether a guess is the stored PIN. An unset PIN never verifies, since an empty one is no
+    ' boundary at all.
+    function Matches(guess as string, hash as dynamic) as boolean
+        if not IsPinShaped(guess) or not isValidAndNotEmpty(hash) then return false
+
+        return HashPin(guess.trim()) = hash
+    end function
+
+    ' How many seconds until another guess is taken, or zero when one is taken now
+    function Remaining() as integer
+        until = Int(Val(settingOr("kids.pinLockedUntil", "0")))
+        if until = 0 then return 0
+
+        left = until - CreateObject("roDateTime").AsSeconds()
+        return left > 0 ? left : 0
+    end function
+
+    ' Records a wrong guess and answers how long the next one has to wait. The count keeps
+    ' climbing past the cap so the wait stays at the ceiling rather than starting over.
+    function RegisterFailure() as integer
+        failed = Int(Val(settingOr("kids.pinFailedAttempts", "0"))) + 1
+        set_user_setting("kids.pinFailedAttempts", failed.toStr())
+        if failed <= PIN_FREE_ATTEMPTS then return 0
+
+        wait = PIN_LOCKOUT_STEP * (failed - PIN_FREE_ATTEMPTS)
+        if wait > PIN_MAX_LOCKOUT then wait = PIN_MAX_LOCKOUT
+        set_user_setting("kids.pinLockedUntil", (CreateObject("roDateTime").AsSeconds() + wait).toStr())
+
+        return wait
+    end function
+
+    sub ClearLockout()
+        set_user_setting("kids.pinFailedAttempts", "0")
+        set_user_setting("kids.pinLockedUntil", "0")
+    end sub
+
+    ' Seconds under a minute, whole minutes above
+    function FormatWait(seconds as integer) as string
+        if seconds < 60 then return substitute(tr("{0}s"), seconds.toStr())
+
+        return substitute(tr("{0}m"), Int(seconds / 60).toStr())
+    end function
+
+    function TooManyAttempts(seconds as integer) as string
+        return substitute(tr("Too many attempts. Try again in {0}."), FormatWait(seconds))
+    end function
+
+end namespace

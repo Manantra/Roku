@@ -1,6 +1,7 @@
 [
   {
     "title": "Moonfin Settings",
+    "requires": "notKidsMode",
     "description": "Navigation, home screen, media bar, and visual customization.",
     "children": [
       {
@@ -1612,6 +1613,7 @@
   },
   {
     "title": "Moonfin Plugin",
+    "requires": "notKidsMode",
     "description": "Plugin connectivity, settings sync, ratings, Seerr, and Achievement Badges.",
     "children": [
       {
@@ -2059,6 +2061,7 @@
   },
   {
     "title": "Playback",
+    "requires": "notKidsMode",
     "description": "Audio/video playback, subtitles, bitrate, and compatibility controls.",
     "icon": "play.png",
     "children": [
@@ -5997,6 +6000,7 @@
   },
   {
     "title": "User Interface",
+    "requires": "notKidsMode",
     "description": "Settings relating to how the application looks.",
     "children": [
       {
@@ -6614,7 +6618,15 @@
     ]
   },
   {
+    "title": "Exit Kids Mode",
+    "description": "Enter your PIN to restore the full app",
+    "settingName": "kids.exit",
+    "requires": "kidsMode",
+    "icon": "lock.png"
+  },
+  {
     "title": "Account & Security",
+    "requires": "notKidsMode",
     "children": [
       {
         "title": "Auto Sign In",
@@ -6630,6 +6642,12 @@
         "settingName": "global.saveCredentials",
         "type": "bool",
         "default": "true",
+        "icon": "lock.png"
+      },
+      {
+        "title": "Kids Mode",
+        "description": "Simplify the app and lock the way out with a PIN",
+        "settingName": "kids.turnOn",
         "icon": "lock.png"
       }
     ],

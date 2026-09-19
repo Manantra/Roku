@@ -4,6 +4,7 @@ import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/PosterLoadStatus.bs"
 import "pkg:/source/utils/config.bs"
+import "pkg:/source/utils/kidsMode.bs"
 import "pkg:/source/utils/multiserver.bs"
 import "pkg:/source/utils/serverMessages.bs"
 import "pkg:/source/utils/themeChrome.bs"
@@ -151,12 +152,16 @@ sub rebuildNavItems()
     if m.favoritesButtonEnabled then m.navItems.push(m.favoritesItem)
     if m.genresButtonEnabled then m.navItems.push(m.genresItem)
 
+    ' Read alongside the show preferences and never written into them, since those sync and would
+    ' follow the account to the parent's other devices
+    kids = kidsMode.Enabled()
+
     seerrEnabled = parseBoolSetting(m.global.session.user.settings["seerr.enabled"])
-    if seerrEnabled and m.seerrButtonEnabled
+    if not kids and seerrEnabled and m.seerrButtonEnabled
         m.navItems.push(m.seerrItem)
     end if
 
-    if m.librariesEnabled then m.navItems.push(m.librariesItem)
+    if not kids and m.librariesEnabled then m.navItems.push(m.librariesItem)
 
     if m.librariesExpanded
         for each libItem in m.libraryItems
@@ -560,7 +565,8 @@ sub loadNavbarSettings()
         seerr: m.global.session.user.settings["seerr.enabled"],
         showSeerr: m.global.session.user.settings["navbar.show_seerr"],
         showMessages: m.global.session.user.settings["navbar.show_messages"],
-        alwaysExpanded: m.global.session.user.settings["navbar.alwaysExpanded"]
+        alwaysExpanded: m.global.session.user.settings["navbar.alwaysExpanded"],
+        kids: m.global.session.user.settings["kids.enabled"]
     }
 end sub
 
@@ -586,7 +592,8 @@ sub onSessionChanged()
         seerr: parseBoolSetting(m.global.session.user.settings["seerr.enabled"]),
         showSeerr: parseBoolSetting(m.global.session.user.settings["navbar.show_seerr"], invalid, true),
         showMessages: parseBoolSetting(m.global.session.user.settings["navbar.show_messages"], invalid, false),
-        alwaysExpanded: parseBoolSetting(m.global.session.user.settings["navbar.alwaysExpanded"])
+        alwaysExpanded: parseBoolSetting(m.global.session.user.settings["navbar.alwaysExpanded"]),
+        kids: parseBoolSetting(m.global.session.user.settings["kids.enabled"])
     }
     lastSettings = {
         shuffle: parseBoolSetting(m.lastNavbarSettings.shuffle),
@@ -596,9 +603,10 @@ sub onSessionChanged()
         seerr: parseBoolSetting(m.lastNavbarSettings.seerr),
         showSeerr: parseBoolSetting(m.lastNavbarSettings.showSeerr, invalid, true),
         showMessages: parseBoolSetting(m.lastNavbarSettings.showMessages, invalid, false),
-        alwaysExpanded: parseBoolSetting(m.lastNavbarSettings.alwaysExpanded)
+        alwaysExpanded: parseBoolSetting(m.lastNavbarSettings.alwaysExpanded),
+        kids: parseBoolSetting(m.lastNavbarSettings.kids)
     }
-    if currentSettings.shuffle <> lastSettings.shuffle or currentSettings.favorites <> lastSettings.favorites or currentSettings.genres <> lastSettings.genres or currentSettings.libraries <> lastSettings.libraries or currentSettings.seerr <> lastSettings.seerr or currentSettings.showSeerr <> lastSettings.showSeerr or currentSettings.showMessages <> lastSettings.showMessages or currentSettings.alwaysExpanded <> lastSettings.alwaysExpanded
+    if currentSettings.shuffle <> lastSettings.shuffle or currentSettings.favorites <> lastSettings.favorites or currentSettings.genres <> lastSettings.genres or currentSettings.libraries <> lastSettings.libraries or currentSettings.seerr <> lastSettings.seerr or currentSettings.showSeerr <> lastSettings.showSeerr or currentSettings.showMessages <> lastSettings.showMessages or currentSettings.alwaysExpanded <> lastSettings.alwaysExpanded or currentSettings.kids <> lastSettings.kids
         loadNavbarSettings()
         rebuildNavItems()
     end if
