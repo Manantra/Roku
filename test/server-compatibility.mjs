@@ -187,7 +187,7 @@ assert.match(detailApiTask, /request\.serverData[^]*?APIRequestForServer\(server
 assert.match(detailApiTask, /LookupCI\("UserId"\)[^]*?targetParams\.UserId = serverData\.userId/, 'Remote detail requests replace active-session user ids');
 
 const detailActions = await readFile('source/utils/detailActions.bs', 'utf8');
-assert.match(detailActions, /function withDetailActionServer\([^]*?getServerInfoFromItem[^]*?request\.serverData = serverData/, 'Detail actions carry the item server context');
+assert.match(detailActions, /function detailActionServerData\([^]*?getServerInfoFromItem\(m\.top\.itemContent\)[^]*?function withDetailActionServer\([^]*?request\.serverData = serverData/, 'Detail actions carry the item server context');
 assert.match(detailActions, /UserId: detailActionUserId\(\)/, 'Detail playlist and collection queries use the owning server user');
 assert.match(detailActions, /m\.artworkDialog\.serverData = detailActionServerData\(\)[^]*?m\.identifyDialog\.serverData = detailActionServerData\(\)/, 'Artwork and admin dialogs inherit the item server');
 
